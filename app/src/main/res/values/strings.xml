@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SlideAnywhere</string>
+
+    <string name="setting_enable">启用全局负一屏</string>
+
+    <string name="section_permissions">权限</string>
+    <string name="permission_overlay">悬浮窗</string>
+    <string name="permission_overlay_desc">必需，用于在其他应用上层显示触发条和面板</string>
+    <string name="permission_notifications">通知</string>
+    <string name="permission_notifications_desc">显示常驻通知，点击通知也能打开面板</string>
+    <string name="permission_battery">忽略电池优化</string>
+    <string name="permission_battery_desc">尽量避免后台被系统关闭</string>
+    <string name="permission_granted">已开启</string>
+    <string name="permission_grant">去开启</string>
+
+    <string name="section_trigger">触发设置</string>
+    <string name="setting_side">触发位置</string>
+    <string name="side_left">左侧</string>
+    <string name="side_right">右侧</string>
+    <string name="setting_handle_position">垂直位置</string>
+    <string name="setting_handle_height">触发条高度</string>
+    <string name="setting_handle_width">触发条宽度</string>
+    <string name="setting_show_handle">显示触发条</string>
+
+    <string name="section_panel">面板</string>
+    <string name="setting_panel_width">负一屏宽度</string>
+
+    <string name="panel_empty_title">还没有卡片</string>
+    <string name="panel_empty_body">应用、快捷方式、网址和便签卡片会在下一版加入。</string>
+    <string name="panel_open_settings">设置</string>
+
+    <string name="notification_channel">常驻服务</string>
+    <string name="notification_title">全局负一屏运行中</string>
+    <string name="notification_text">点击打开面板</string>
+</resources>
