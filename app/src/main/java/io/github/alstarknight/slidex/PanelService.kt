@@ -218,6 +218,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             initialPage = page,
             widthFraction = prefs.panelWidthPercent / 100f,
             blurBehind = prefs.panelBlur,
+            seeThroughOnBrightness = prefs.brightnessSeeThrough,
             store = ConfigStore.get(this),
             launcher = launcher,
             onOpenSettings = {

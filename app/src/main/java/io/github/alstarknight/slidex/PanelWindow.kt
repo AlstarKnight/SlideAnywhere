@@ -30,6 +30,7 @@ class PanelWindow(
     private val initialPage: Int,
     private val widthFraction: Float,
     private val blurBehind: Boolean,
+    private val seeThroughOnBrightness: Boolean,
     private val store: ConfigStore,
     private val launcher: ItemLauncher,
     private val onOpenSettings: () -> Unit,
@@ -53,6 +54,7 @@ class PanelWindow(
                         visibleState = visibleState,
                         side = side,
                         widthFraction = widthFraction,
+                        seeThroughAllowed = seeThroughOnBrightness,
                         onDismiss = ::hide,
                         onHidden = ::remove,
                     ) {

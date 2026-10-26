@@ -68,6 +68,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_PANEL_BLUR, false)
         set(value) = prefs.edit { putBoolean(KEY_PANEL_BLUR, value) }
 
+    /** Fade the panel out while the brightness slider is dragged, to show the new brightness behind it. */
+    var brightnessSeeThrough: Boolean
+        get() = prefs.getBoolean(KEY_BRIGHTNESS_SEE_THROUGH, true)
+        set(value) = prefs.edit { putBoolean(KEY_BRIGHTNESS_SEE_THROUGH, value) }
+
     var triggerMode: TriggerMode
         get() = enumPref(KEY_TRIGGER_MODE, TriggerMode.EDGE)
         set(value) = prefs.edit { putString(KEY_TRIGGER_MODE, value.name) }
@@ -145,6 +150,7 @@ class Prefs(context: Context) {
         const val KEY_SHOW_HANDLE = "show_handle"
         const val KEY_PANEL_WIDTH = "panel_width"
         const val KEY_PANEL_BLUR = "panel_blur"
+        const val KEY_BRIGHTNESS_SEE_THROUGH = "brightness_see_through"
         const val KEY_LISTED_APPS = "hidden_apps"
         const val KEY_APP_LIST_MODE = "app_list_mode"
         const val KEY_AVOID_KEYBOARD = "avoid_keyboard"
