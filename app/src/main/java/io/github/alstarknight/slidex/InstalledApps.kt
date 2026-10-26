@@ -5,13 +5,16 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
+import android.icu.text.Transliterator
+import android.os.Build
 import android.util.LruCache
+import androidx.annotation.RequiresApi
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
 import java.text.Collator
 
-data class AppEntry(val label: String, val packageName: String, val activityName: String)
+data class AppEntry(val label: String, val packageName: String, val activityName: String, val search: SearchKey)
 
 object InstalledApps {
     private val icons = LruCache<String, ImageBitmap>(200)
@@ -22,10 +25,13 @@ object InstalledApps {
         val collator = Collator.getInstance()
         return pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
             .map {
+                val label = it.loadLabel(pm).toString()
+                val packageName = it.activityInfo.packageName
                 AppEntry(
-                    label = it.loadLabel(pm).toString(),
-                    packageName = it.activityInfo.packageName,
+                    label = label,
+                    packageName = packageName,
                     activityName = it.activityInfo.name,
+                    search = searchKey(label, packageName, Pinyin::syllable),
                 )
             }
             .sortedWith { a, b -> collator.compare(a.label, b.label) }
@@ -75,4 +81,23 @@ object InstalledApps {
         icons.put(key, bitmap)
         return bitmap
     }
+}
+
+/** Pinyin of Chinese characters for app search, from the system's transliterator (Android 10+). */
+private object Pinyin {
+    private val cache = HashMap<Char, String>()
+
+    @Synchronized
+    fun syllable(char: Char): String? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+        if (Character.UnicodeScript.of(char.code) != Character.UnicodeScript.HAN) return null
+        return cache.getOrPut(char) { HanLatin.transliterate(char) }
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.Q)
+private object HanLatin {
+    private val transliterator = Transliterator.getInstance("Han-Latin; Latin-ASCII")
+
+    fun transliterate(char: Char): String = transliterator.transliterate(char.toString()).trim()
 }

@@ -494,7 +494,7 @@ private fun HiddenAppsDialog(selected: Set<String>, onDone: (Set<String>) -> Uni
                         CircularProgressIndicator()
                     }
                 } else {
-                    val filtered = list.filter { query.isBlank() || it.label.contains(query.trim(), ignoreCase = true) }
+                    val filtered = searchApps(list, query) { it.search }
                     LazyColumn(Modifier.weight(1f)) {
                         items(filtered, key = { it.packageName }) { app ->
                             val on = app.packageName in checked

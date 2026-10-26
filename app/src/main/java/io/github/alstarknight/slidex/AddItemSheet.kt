@@ -98,7 +98,7 @@ private fun AppPicker(onAdd: (Item) -> Unit) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
     }
-    val filtered = list.filter { query.isBlank() || it.label.contains(query.trim(), ignoreCase = true) }
+    val filtered = searchApps(list, query) { it.search }
     LazyColumn {
         items(filtered, key = { "${it.packageName}/${it.activityName}" }) { app ->
             val item = AppItem(app.label, app.packageName, app.activityName)
@@ -200,7 +200,7 @@ fun AppDrawer(onLaunch: (AppItem) -> Unit, onDismiss: () -> Unit) {
             if (list == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             } else {
-                AppGrid(list.filter { query.isBlank() || it.label.contains(query.trim(), ignoreCase = true) }, onLaunch)
+                AppGrid(searchApps(list, query) { it.search }, onLaunch)
             }
         }
     }

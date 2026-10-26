@@ -112,7 +112,7 @@
     <string name="add_tab_apps">应用</string>
     <string name="add_tab_actions">快捷方式</string>
     <string name="add_tab_link">网址 / URI</string>
-    <string name="search_apps">搜索应用</string>
+    <string name="search_apps">搜索应用（支持拼音、首字母）</string>
     <string name="link_label">名称</string>
     <string name="link_uri">网址或 URI</string>
     <string name="link_uri_hint">支持 https://、tel:（拨号）、应用 Scheme（如 alipays://）和 intent: URI</string>
