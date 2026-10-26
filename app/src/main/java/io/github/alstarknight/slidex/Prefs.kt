@@ -38,6 +38,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_SHOW_HANDLE, true)
         set(value) = prefs.edit { putBoolean(KEY_SHOW_HANDLE, value) }
 
+    /** Whether a swipe from the edge handle pulls the panel out under the finger, rather than opening it at once. */
+    var followFinger: Boolean
+        get() = prefs.getBoolean(KEY_FOLLOW_FINGER, true)
+        set(value) = prefs.edit { putBoolean(KEY_FOLLOW_FINGER, value) }
+
     var panelWidthPercent: Int
         get() = prefs.getInt(KEY_PANEL_WIDTH, 85)
         set(value) = prefs.edit { putInt(KEY_PANEL_WIDTH, value) }
@@ -153,6 +158,7 @@ class Prefs(context: Context) {
         const val KEY_HANDLE_HEIGHT = "handle_height"
         const val KEY_HANDLE_WIDTH = "handle_width"
         const val KEY_SHOW_HANDLE = "show_handle"
+        const val KEY_FOLLOW_FINGER = "follow_finger"
         const val KEY_PANEL_WIDTH = "panel_width"
         const val KEY_PANEL_BLUR = "panel_blur"
         const val KEY_SCRIM = "scrim"

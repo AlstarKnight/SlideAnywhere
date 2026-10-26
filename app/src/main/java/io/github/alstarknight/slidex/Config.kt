@@ -122,6 +122,15 @@ data class TextCard(
 const val DEFAULT_TEXT_SIZE = 18
 val TEXT_SIZE_RANGE = 10..48
 
+/** A sentence from the Hitokoto service (hitokoto.cn), like the original app's 一言 card; a tap shows another. */
+@Serializable
+@SerialName("hitokoto")
+data class HitokotoCard(
+    override val id: String,
+    override val title: String,
+    override val showTitle: Boolean = true,
+) : Card
+
 /** Height of text and note cards: [AUTO_HEIGHT] fits the content, anything else is a fixed height in dp. */
 const val AUTO_HEIGHT = 0
 val CARD_HEIGHT_RANGE = AUTO_HEIGHT..480

@@ -62,6 +62,7 @@
     <string name="setting_handle_height">触发条高度</string>
     <string name="setting_handle_width">触发条宽度</string>
     <string name="setting_show_handle">显示触发条</string>
+    <string name="setting_follow_finger">面板跟手滑出</string>
     <string name="setting_ball_shape">形状</string>
     <string name="ball_circle">圆形</string>
     <string name="ball_square">方形</string>
@@ -72,6 +73,7 @@
     <string name="ball_action_panel">打开面板</string>
     <string name="ball_hint">拖动图标可以放到屏幕任意位置，面板从离图标较近的一侧滑出。</string>
     <string name="handle_drag_hint">长按触发条约半秒，等它变亮后拖动，可以改变上下位置，拖过屏幕中线会换到另一侧。</string>
+    <string name="follow_finger_hint">开启后，从触发条往里拉，面板会跟着手指出来，松手时拉出超过一半或快速一甩就打开，否则收回；关闭则一拉就整个弹出。面板打开后，在第一页朝屏幕边缘滑（面板在左边时是在最后一页），可以把面板推回去关掉。</string>
     <string name="ball_description">打开 SlideX 面板</string>
     <string name="section_app_list">黑名单 / 白名单</string>
     <string name="setting_app_list_mode">模式</string>
@@ -154,6 +156,7 @@
     <string name="default_card_shortcuts">快捷方式</string>
     <string name="default_card_note">便签</string>
     <string name="default_card_text">文字</string>
+    <string name="default_card_hitokoto">一言</string>
     <string name="default_card_switches">开关</string>
     <string name="new_grid_card_title">新卡片</string>
 
@@ -171,10 +174,13 @@
     <string name="note_placeholder">点击可输入便签</string>
     <string name="text_card_hint">输入要显示的文字</string>
     <string name="text_card_empty">长按这里，进入编辑后输入文字</string>
+    <string name="hitokoto_loading">正在获取一言…</string>
+    <string name="hitokoto_failed">没有取到一言，请检查网络后点一下重试</string>
 
     <string name="page_add_grid_card">添加图标卡片</string>
     <string name="page_add_note_card">添加便签</string>
     <string name="page_add_text_card">添加文字</string>
+    <string name="page_add_hitokoto_card">添加一言</string>
     <string name="page_add_battery_card">添加电量卡片</string>
     <string name="page_add_brightness_card">添加亮度条</string>
     <string name="page_add_volume_card">添加音量条</string>
@@ -194,6 +200,7 @@
     <string name="preset_section">常用入口</string>
     <string name="preset_scan">扫一扫</string>
     <string name="preset_pay_code">付款码</string>
+    <string name="preset_pay_code_trial">付款码（试验）</string>
     <string name="preset_receive_code">收款码</string>
     <string name="preset_bus_code">乘车码</string>
     <string name="preset_transfer">转账</string>

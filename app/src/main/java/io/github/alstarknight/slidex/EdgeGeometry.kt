@@ -21,6 +21,24 @@ fun handleTop(screenHeight: Int, handleHeight: Int, positionPercent: Int): Int {
 fun handlePositionPercent(screenHeight: Int, handleHeight: Int, top: Int): Int =
     if (screenHeight <= 0) 50 else ((top + handleHeight / 2f) * 100 / screenHeight).roundToInt().coerceIn(0, 100)
 
+/** How far out (0 to 1) a panel [panelWidth] wide on [side] is when its inner edge is under a finger at [x]. */
+fun panelFraction(side: Side, x: Float, screenWidth: Int, panelWidth: Float): Float {
+    if (panelWidth <= 0f) return 1f
+    val shown = if (side == Side.LEFT) x else screenWidth - x
+    return (shown / panelWidth).coerceIn(0f, 1f)
+}
+
+/**
+ * Whether a panel let go at [fraction] (0 hidden, 1 fully out) settles open. [velocity] is how fast it was moving
+ * out, in pixels per second (negative when moving in): a flick faster than [flingVelocity] decides, otherwise the
+ * panel opens when it is at least half out.
+ */
+fun settlesOpen(fraction: Float, velocity: Float, flingVelocity: Float): Boolean = when {
+    velocity >= flingVelocity -> true
+    velocity <= -flingVelocity -> false
+    else -> fraction >= 0.5f
+}
+
 /** The side edge nearer to a point at [x], e.g. the center of the floating icon or a finger dragging the handle. */
 fun nearestSide(x: Float, screenWidth: Int): Side = if (x < screenWidth / 2f) Side.LEFT else Side.RIGHT
 

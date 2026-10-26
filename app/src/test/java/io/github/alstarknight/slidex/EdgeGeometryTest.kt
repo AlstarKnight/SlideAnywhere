@@ -56,6 +56,23 @@ class EdgeGeometryTest {
     }
 
     @Test
+    fun panelFollowsTheFingerFromEitherEdge() {
+        assertEquals(0.5f, panelFraction(Side.LEFT, x = 400f, screenWidth = 1000, panelWidth = 800f), 0.0001f)
+        assertEquals(0.25f, panelFraction(Side.RIGHT, x = 800f, screenWidth = 1000, panelWidth = 800f), 0.0001f)
+        assertEquals(1f, panelFraction(Side.LEFT, x = 950f, screenWidth = 1000, panelWidth = 800f), 0.0001f)
+        assertEquals(0f, panelFraction(Side.RIGHT, x = 1010f, screenWidth = 1000, panelWidth = 800f), 0.0001f)
+        assertEquals(1f, panelFraction(Side.LEFT, x = 0f, screenWidth = 1000, panelWidth = 0f), 0.0001f)
+    }
+
+    @Test
+    fun aFlickDecidesOtherwiseThePanelOpensWhenHalfOut() {
+        assertTrue(settlesOpen(fraction = 0.2f, velocity = 500f, flingVelocity = 400f))
+        assertFalse(settlesOpen(fraction = 0.9f, velocity = -500f, flingVelocity = 400f))
+        assertTrue(settlesOpen(fraction = 0.5f, velocity = -100f, flingVelocity = 400f))
+        assertFalse(settlesOpen(fraction = 0.4f, velocity = 100f, flingVelocity = 400f))
+    }
+
+    @Test
     fun nearestSideSplitsTheScreenInHalf() {
         assertEquals(Side.LEFT, nearestSide(x = 400f, screenWidth = 1000))
         assertEquals(Side.RIGHT, nearestSide(x = 600f, screenWidth = 1000))

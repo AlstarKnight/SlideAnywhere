@@ -32,6 +32,7 @@ fun PanelConfig.renameCard(cardId: String, title: String): PanelConfig = mapCard
         is GridCard -> it.copy(title = title)
         is NoteCard -> it.copy(title = title)
         is TextCard -> it.copy(title = title)
+        is HitokotoCard -> it.copy(title = title)
         is SystemCard -> it.copy(title = title)
         is UsageCard -> it.copy(title = title)
         is WidgetCard -> it.copy(title = title)
@@ -42,6 +43,7 @@ fun PanelConfig.setShowTitle(cardId: String, show: Boolean): PanelConfig = mapCa
     when (it) {
         is GridCard -> it.copy(showTitle = show)
         is NoteCard -> it.copy(showTitle = show)
+        is HitokotoCard -> it.copy(showTitle = show)
         is SystemCard -> it.copy(showTitle = show)
         is UsageCard -> it.copy(showTitle = show)
         is WidgetCard -> it.copy(showTitle = show)

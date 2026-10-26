@@ -132,7 +132,8 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
     private fun updateTriggerVisibility() {
         val front = ActionAccessibilityService.foregroundPackage.value
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val visible = panel == null &&
+        // The handle stays while a finger drags the panel out from it: hiding it would cancel the touch.
+        val visible = panel?.held != false &&
             triggerAllowedIn(front, prefs.appListMode, prefs.listedApps, packageName) &&
             !(landscape && prefs.hideInLandscape)
         handle?.visibility = if (visible) View.VISIBLE else View.GONE
@@ -152,7 +153,17 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
     }
 
     private fun addHandle() {
-        val view = EdgeHandleView(this, onOpen = { openPanel(prefs.side) }, onMove = ::moveHandle, onMoveEnd = ::dropHandle)
+        val view = EdgeHandleView(
+            this,
+            onOpen = { rawX -> openPanel(prefs.side, heldAt = rawX.takeIf { prefs.followFinger }) },
+            onDrag = { rawX -> panel?.drag(rawX) },
+            onRelease = { velocityX ->
+                panel?.release(velocityX)
+                updateTriggerVisibility()
+            },
+            onMove = ::moveHandle,
+            onMoveEnd = ::dropHandle,
+        )
         handle = view
         applyHandleStyle(view)
         windowManager.addView(view, handleLayoutParams())
@@ -209,7 +220,8 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
         }
     }
 
-    private fun openPanel(side: Side, page: Int = 0) {
+    /** Opens the panel on [page]; with [heldAt] it follows a finger at that screen x instead of sliding out. */
+    private fun openPanel(side: Side, page: Int = 0, heldAt: Float? = null) {
         if (panel != null || (handle == null && ball == null)) return
         panel = PanelWindow(
             context = this,
@@ -230,7 +242,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
                 panel = null
                 updateTriggerVisibility()
             },
-        ).also { it.show() }
+        ).also { it.show(heldAt) }
         updateTriggerVisibility()
     }
 

@@ -391,6 +391,12 @@ private fun EdgeHandleSettings(prefs: Prefs) {
             showHandle = it
             prefs.showHandle = it
         }
+        var followFinger by remember { mutableStateOf(prefs.followFinger) }
+        SwitchRow(stringResource(R.string.setting_follow_finger), followFinger) {
+            followFinger = it
+            prefs.followFinger = it
+        }
+        Hint(stringResource(R.string.follow_finger_hint))
     }
 }
 

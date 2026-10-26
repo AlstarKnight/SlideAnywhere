@@ -224,6 +224,10 @@ fun PanelContent(
                                             val title = it
                                             store.update { c -> c.addCard(pageIndex, TextCard(ConfigStore.newId(), title)) }
                                         },
+                                        onAddHitokoto = {
+                                            val title = it
+                                            store.update { c -> c.addCard(pageIndex, HitokotoCard(ConfigStore.newId(), title)) }
+                                        },
                                         onAddSystem = { kind, title ->
                                             store.update { c -> c.addCard(pageIndex, SystemCard(ConfigStore.newId(), title, kind)) }
                                         },
@@ -448,6 +452,7 @@ private fun PanelCard(
                 }
                 is NoteCard -> NoteField(card, store)
                 is TextCard -> if (editing) TextCardEditor(card, store) else CardText(card, onStartEditing)
+                is HitokotoCard -> HitokotoContent(onStartEditing)
                 is SystemCard -> SystemCardContent(card.kind, onClose)
                 is UsageCard -> UsageCardContent(card, editing, store, onLaunch, onClose)
                 is WidgetCard -> WidgetCardContent(card, editing, store, onClose)
@@ -996,6 +1001,57 @@ private fun textColor(card: TextCard): Color {
     return own ?: MaterialTheme.colorScheme.onSurface
 }
 
+/**
+ * A sentence from hitokoto.cn and where it is from. It starts with the last one fetched while the app runs and asks
+ * for a new one when that is a minute old; a tap asks for another, a long press starts edit mode.
+ */
+@Composable
+private fun HitokotoContent(onStartEditing: () -> Unit) {
+    var sentence by remember { mutableStateOf(HitokotoCache.last) }
+    var loading by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    fun load() {
+        if (loading) return
+        loading = true
+        failed = false
+        scope.launch {
+            val fetched = withContext(Dispatchers.IO) { fetchHitokoto() }
+            if (fetched != null) {
+                HitokotoCache.put(fetched, System.currentTimeMillis())
+                sentence = fetched
+            }
+            failed = fetched == null
+            loading = false
+        }
+    }
+    LaunchedEffect(Unit) { if (HitokotoCache.isStale(System.currentTimeMillis())) load() }
+    val hintStyle = MaterialTheme.typography.bodySmall
+    val hintColor = MaterialTheme.colorScheme.onSurfaceVariant
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .pointerInput(Unit) { detectTapGestures(onTap = { load() }, onLongPress = { onStartEditing() }) }
+            .padding(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        val shown = sentence
+        if (shown == null) {
+            Text(
+                stringResource(if (failed) R.string.hitokoto_failed else R.string.hitokoto_loading),
+                style = MaterialTheme.typography.bodyMedium,
+                color = hintColor,
+            )
+        } else {
+            Text(shown.hitokoto, style = MaterialTheme.typography.bodyLarge)
+            shown.attribution()?.let {
+                Text(it, Modifier.fillMaxWidth(), style = hintStyle, color = hintColor, textAlign = TextAlign.End)
+            }
+            if (failed) Text(stringResource(R.string.hitokoto_failed), style = hintStyle, color = hintColor)
+        }
+    }
+}
+
 @Composable
 private fun PageEditor(
     canDelete: Boolean,
@@ -1004,6 +1060,7 @@ private fun PageEditor(
     onAddGrid: (String) -> Unit,
     onAddNote: (String) -> Unit,
     onAddText: (String) -> Unit,
+    onAddHitokoto: (String) -> Unit,
     onAddSystem: (SystemKind, String) -> Unit,
     onAddUsage: (UsageKind, String) -> Unit,
     onAddWidget: () -> Unit,
@@ -1015,6 +1072,7 @@ private fun PageEditor(
     val gridTitle = stringResource(R.string.new_grid_card_title)
     val noteTitle = stringResource(R.string.default_card_note)
     val textTitle = stringResource(R.string.default_card_text)
+    val hitokotoTitle = stringResource(R.string.default_card_hitokoto)
     val systemTitles = SystemKind.entries.associateWith { stringResource(it.labelRes) }
     val recentTitle = stringResource(R.string.usage_recent)
     val frequentTitle = stringResource(R.string.usage_frequent)
@@ -1035,8 +1093,9 @@ private fun PageEditor(
         )
         ButtonRow(
             R.string.page_add_text_card to { onAddText(textTitle) },
-            R.string.page_add_widget_card to onAddWidget,
+            R.string.page_add_hitokoto_card to { onAddHitokoto(hitokotoTitle) },
         )
+        ButtonRow(R.string.page_add_widget_card to onAddWidget)
         ButtonRow(
             R.string.page_add to onAddPage,
             R.string.page_delete to onDeletePage.takeIf { canDelete },

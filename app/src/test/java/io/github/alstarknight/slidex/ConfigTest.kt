@@ -165,6 +165,14 @@ class ConfigTest {
     }
 
     @Test
+    fun hitokotoCardsRoundTripRenameAndHideTheirTitle() {
+        val withHitokoto = config.addCard(1, HitokotoCard("h", "一言"))
+        assertEquals(withHitokoto, parseConfig(withHitokoto.toJson()))
+        assertEquals("每日一句", withHitokoto.renameCard("h", "每日一句").pages[1].cards[0].title)
+        assertEquals(false, withHitokoto.setShowTitle("h", false).pages[1].cards[0].showTitle)
+    }
+
+    @Test
     fun textAndNoteHeightsAreAutoOrWithinRange() {
         val withText = config.addCard(1, TextCard("t", "文字"))
         assertEquals(AUTO_HEIGHT, (withText.pages[1].cards[0] as TextCard).heightDp)
