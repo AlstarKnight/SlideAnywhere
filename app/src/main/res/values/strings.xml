@@ -14,7 +14,9 @@
     <string name="page_trigger">触发设置</string>
     <string name="page_trigger_summary">触发方式、位置、区域、悬浮图标</string>
     <string name="page_theme">主题外观</string>
-    <string name="page_theme_summary">主题、深浅色、图标包、面板宽度和模糊</string>
+    <string name="page_theme_summary">主题、深浅色、图标包、面板宽度、模糊和遮罩</string>
+    <string name="page_style">页面外观</string>
+    <string name="page_style_summary">每页的主题、背景图片、透明度，卡片的标题、名称和高度</string>
     <string name="page_advanced">高级设置</string>
     <string name="page_advanced_summary">黑名单/白名单、横屏隐藏、磁贴和桌面快捷方式、通知</string>
     <string name="page_config">配置管理</string>
@@ -106,6 +108,40 @@
     <string name="setting_panel_blur">背景模糊</string>
     <string name="setting_brightness_see_through">调节亮度时面板变透明</string>
     <string name="panel_blur_hint">打开面板时把后面的界面模糊。部分手机在省电模式下或系统关闭了模糊效果时不生效。</string>
+    <string name="setting_scrim">背景遮罩</string>
+    <string name="scrim_hint">打开面板时把后面的界面调暗多少，调到 0 就不调暗。下次打开面板时生效。</string>
+
+    <string name="page_number">第 %d 页</string>
+    <string name="page_own_theme">本页单独设置主题</string>
+    <string name="page_own_theme_hint">关闭时跟随「主题外观」里的主题和深浅色；深浅色选「默认」时也跟随那里。</string>
+    <string name="style_default">默认</string>
+    <string name="section_background">背景</string>
+    <string name="background_pick">选择背景图片</string>
+    <string name="background_change">更换图片</string>
+    <string name="background_remove">移除图片</string>
+    <string name="background_failed">图片读取失败</string>
+    <string name="background_fit">图片显示方式</string>
+    <string name="fit_crop">铺满</string>
+    <string name="fit_fill_width">横向填充</string>
+    <string name="fit_stretch">拉伸</string>
+    <string name="background_fit_hint">卡片多时只有卡片滚动，图片固定不动，不会被拉长。铺满：等比放大盖住整页，多出的部分裁掉；横向填充：宽度对齐、从顶部开始，下方不够的部分用主题色补齐；拉伸：拉到和页面一样大，可能变形。</string>
+    <string name="background_transparency">背景透明度</string>
+    <string name="card_transparency">卡片透明度</string>
+    <string name="transparency_hint">调高后能透过面板看到后面的界面，搭配「主题外观」里的背景模糊效果更好。</string>
+    <string name="section_cards">卡片</string>
+    <string name="style_no_cards">这一页还没有卡片。</string>
+    <string name="card_show_title">显示标题</string>
+    <string name="card_show_labels">显示名称</string>
+    <string name="card_height">高度</string>
+    <string name="height_auto">自动</string>
+    <string name="text_size">文字大小</string>
+    <string name="text_bold">加粗</string>
+    <string name="text_italic">斜体</string>
+    <string name="text_centered">居中</string>
+    <string name="text_card_background">显示卡片底色</string>
+    <string name="text_color">文字颜色</string>
+    <string name="text_color_theme">跟随主题</string>
+    <string name="style_preview">打开面板看看这一页</string>
 
     <string name="panel_open_settings">设置</string>
     <string name="panel_empty_page">这一页还没有卡片。点右上角的编辑按钮或长按卡片标题，可以添加卡片。</string>
@@ -117,11 +153,12 @@
     <string name="default_card_apps">应用</string>
     <string name="default_card_shortcuts">快捷方式</string>
     <string name="default_card_note">便签</string>
+    <string name="default_card_text">文字</string>
     <string name="default_card_switches">开关</string>
     <string name="new_grid_card_title">新卡片</string>
 
     <string name="card_drag">按住拖动排序</string>
-    <string name="edit_drag_hint">长按图标可拖动换位置；按住卡片右上角的 ≡ 可拖动卡片</string>
+    <string name="edit_drag_hint">点图标可改名称，长按图标可拖动换位置；按住卡片右上角的 ≡ 可拖动卡片</string>
     <string name="card_rename">重命名</string>
     <string name="card_delete">删除卡片</string>
     <string name="card_empty">还没有图标，进入编辑模式后点「添加」。</string>
@@ -130,10 +167,14 @@
     <string name="card_columns_more">增加</string>
     <string name="item_add">添加</string>
     <string name="item_remove">移除</string>
+    <string name="item_rename">图标名称</string>
     <string name="note_placeholder">点击可输入便签</string>
+    <string name="text_card_hint">输入要显示的文字</string>
+    <string name="text_card_empty">长按这里，进入编辑后输入文字</string>
 
     <string name="page_add_grid_card">添加图标卡片</string>
     <string name="page_add_note_card">添加便签</string>
+    <string name="page_add_text_card">添加文字</string>
     <string name="page_add_battery_card">添加电量卡片</string>
     <string name="page_add_brightness_card">添加亮度条</string>
     <string name="page_add_volume_card">添加音量条</string>
@@ -243,7 +284,7 @@
     <string name="accessibility_label">SlideX 快捷操作</string>
     <string name="accessibility_description">用于执行快捷方式卡片里的锁屏、截屏、打开通知栏、最近任务、分屏等系统操作；识别当前在前台的应用，以便按黑名单或白名单显示触发条；以及识别输入法窗口的位置，让悬浮图标避开键盘。只查看窗口的类型和位置，不读取屏幕上的文字和内容。</string>
 
-    <string name="config_hint">配置包含所有页面和卡片，导出为 JSON 文件后，换机或重装时可以导入。设置项不在其中。</string>
+    <string name="config_hint">配置包含所有页面和卡片，导出为 JSON 文件后，换机或重装时可以导入。设置项和背景图片不在其中。</string>
     <string name="about_version">%1$s %2$s</string>
     <string name="about_project">项目主页</string>
     <string name="about_credits">功能和交互参考已停更的「全局负一屏」，边缘触发参考 Smart Edge（MIT），图标来自 Material Symbols（Apache 2.0）。</string>

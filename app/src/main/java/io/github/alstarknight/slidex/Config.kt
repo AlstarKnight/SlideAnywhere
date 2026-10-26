@@ -9,12 +9,65 @@ import kotlinx.serialization.json.Json
 data class PanelConfig(val version: Int = 1, val pages: List<Page> = listOf(Page()))
 
 @Serializable
-data class Page(val cards: List<Card> = emptyList())
+data class Page(val cards: List<Card> = emptyList(), val style: PageStyle = PageStyle())
+
+/** How one page looks; every page can have its own. */
+@Serializable
+data class PageStyle(
+    /** Look preset of this page, or null to follow the one chosen in the settings. */
+    val preset: ThemePreset? = null,
+    /** LIGHT or DARK, or null to follow the settings. */
+    val darkMode: DarkMode? = null,
+    /** Picture behind the page: a file name under `files/backgrounds`, or null for the theme color. */
+    val background: String? = null,
+    val backgroundFit: BackgroundFit = BackgroundFit.CROP,
+    /** How see-through the page's background is, in percent; 0 is opaque. */
+    val backgroundTransparency: Int = 0,
+    /** How see-through the cards are, in percent. */
+    val cardTransparency: Int = 0,
+)
+
+/** How a background picture fills the page. It stays put while the cards scroll, so a long page never stretches it. */
+@Serializable
+enum class BackgroundFit {
+    /** Fills the page, cutting off what does not fit, evenly from both sides. */
+    CROP,
+
+    /** As wide as the page, from the top; the theme color fills the rest when the picture is shorter. */
+    FILL_WIDTH,
+
+    /** Stretched to the page's size. */
+    STRETCH,
+}
+
+val TRANSPARENCY_RANGE = 0..100
+
+/** Look presets, after the interface styles of Minipad Next. */
+@Serializable
+enum class ThemePreset {
+    /** Blue-purple gradients; "dreamy" when light, a starry night when dark. */
+    STARRY,
+
+    /** Material You: wallpaper colors on Android 12+, the Material baseline before that. */
+    MATERIAL,
+
+    /** Quiet paper look with thin borders and one blue accent. */
+    PAPER,
+
+    /** Warm cream and orange. */
+    CLASSIC,
+}
+
+@Serializable
+enum class DarkMode { SYSTEM, LIGHT, DARK }
 
 @Serializable
 sealed interface Card {
     val id: String
     val title: String
+
+    /** Whether the title is shown above the card's content; edit mode always shows it. */
+    val showTitle: Boolean
 }
 
 /** A titled grid of icons (apps, links, shortcuts), like the original app's cards. */
@@ -26,6 +79,9 @@ data class GridCard(
     val items: List<Item> = emptyList(),
     /** Icons per row. */
     val columns: Int = DEFAULT_COLUMNS,
+    override val showTitle: Boolean = true,
+    /** Whether the names are shown under the icons. */
+    val showLabels: Boolean = true,
 ) : Card
 
 const val DEFAULT_COLUMNS = 4
@@ -33,12 +89,52 @@ val COLUMN_RANGE = 2..6
 
 @Serializable
 @SerialName("note")
-data class NoteCard(override val id: String, override val title: String, val text: String = "") : Card
+data class NoteCard(
+    override val id: String,
+    override val title: String,
+    val text: String = "",
+    val heightDp: Int = AUTO_HEIGHT,
+    override val showTitle: Boolean = true,
+) : Card
+
+/** Text shown as it is, like the original app's text module: a heading, a motto, a reminder. */
+@Serializable
+@SerialName("text")
+data class TextCard(
+    override val id: String,
+    override val title: String,
+    val text: String = "",
+    /** Font size in sp. */
+    val textSize: Int = DEFAULT_TEXT_SIZE,
+    val bold: Boolean = false,
+    val italic: Boolean = false,
+    val centered: Boolean = false,
+    /** Text color as `#RRGGBB`, or null for the theme's text color. */
+    val color: String? = null,
+    /** Whether the text sits on a card like the others, or straight on the page. */
+    val cardBackground: Boolean = false,
+    val heightDp: Int = AUTO_HEIGHT,
+) : Card {
+    /** Only the text is shown; the title just names the card in edit mode. */
+    override val showTitle: Boolean get() = false
+}
+
+const val DEFAULT_TEXT_SIZE = 18
+val TEXT_SIZE_RANGE = 10..48
+
+/** Height of text and note cards: [AUTO_HEIGHT] fits the content, anything else is a fixed height in dp. */
+const val AUTO_HEIGHT = 0
+val CARD_HEIGHT_RANGE = AUTO_HEIGHT..480
 
 /** Live system information or controls: battery, brightness, volume, memory and storage. */
 @Serializable
 @SerialName("system")
-data class SystemCard(override val id: String, override val title: String, val kind: SystemKind) : Card
+data class SystemCard(
+    override val id: String,
+    override val title: String,
+    val kind: SystemKind,
+    override val showTitle: Boolean = true,
+) : Card
 
 @Serializable
 enum class SystemKind { BATTERY, BRIGHTNESS, VOLUME, STORAGE }
@@ -51,6 +147,8 @@ data class UsageCard(
     override val title: String,
     val kind: UsageKind,
     val columns: Int = DEFAULT_COLUMNS,
+    override val showTitle: Boolean = true,
+    val showLabels: Boolean = true,
 ) : Card
 
 @Serializable
@@ -64,10 +162,12 @@ data class WidgetCard(
     override val title: String,
     val widgetId: Int,
     val heightDp: Int = DEFAULT_WIDGET_HEIGHT,
+    override val showTitle: Boolean = true,
 ) : Card
 
 const val DEFAULT_WIDGET_HEIGHT = 180
 val WIDGET_HEIGHT_RANGE = 60..480
+const val WIDGET_HEIGHT_STEP = 20
 
 @Serializable
 sealed interface Item {

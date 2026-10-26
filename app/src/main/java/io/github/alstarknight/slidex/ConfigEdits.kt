@@ -8,6 +8,12 @@ fun PanelConfig.removePage(index: Int): PanelConfig =
 
 fun PanelConfig.movePage(index: Int, offset: Int): PanelConfig = copy(pages = pages.move(index, index + offset))
 
+fun PanelConfig.setPageStyle(index: Int, transform: (PageStyle) -> PageStyle): PanelConfig =
+    copy(pages = pages.mapIndexed { i, page -> if (i == index) page.copy(style = transform(page.style)) else page })
+
+/** Pictures still used as a page background; any other saved picture can be deleted. */
+fun PanelConfig.backgrounds(): Set<String> = pages.mapNotNullTo(mutableSetOf()) { it.style.background }
+
 fun PanelConfig.addCard(pageIndex: Int, card: Card): PanelConfig =
     copy(pages = pages.mapIndexed { i, page -> if (i == pageIndex) page.copy(cards = page.cards + card) else page })
 
@@ -25,14 +31,41 @@ fun PanelConfig.renameCard(cardId: String, title: String): PanelConfig = mapCard
     when (it) {
         is GridCard -> it.copy(title = title)
         is NoteCard -> it.copy(title = title)
+        is TextCard -> it.copy(title = title)
         is SystemCard -> it.copy(title = title)
         is UsageCard -> it.copy(title = title)
         is WidgetCard -> it.copy(title = title)
     }
 }
 
-fun PanelConfig.setWidgetHeight(cardId: String, heightDp: Int): PanelConfig = mapCard(cardId) {
-    if (it is WidgetCard) it.copy(heightDp = heightDp.coerceIn(WIDGET_HEIGHT_RANGE)) else it
+fun PanelConfig.setShowTitle(cardId: String, show: Boolean): PanelConfig = mapCard(cardId) {
+    when (it) {
+        is GridCard -> it.copy(showTitle = show)
+        is NoteCard -> it.copy(showTitle = show)
+        is SystemCard -> it.copy(showTitle = show)
+        is UsageCard -> it.copy(showTitle = show)
+        is WidgetCard -> it.copy(showTitle = show)
+        is TextCard -> it
+    }
+}
+
+/** Shows or hides the names under the icons of an icon or usage card. */
+fun PanelConfig.setShowLabels(cardId: String, show: Boolean): PanelConfig = mapCard(cardId) {
+    when (it) {
+        is GridCard -> it.copy(showLabels = show)
+        is UsageCard -> it.copy(showLabels = show)
+        else -> it
+    }
+}
+
+/** Sets the height of a text, note or widget card; other cards always fit their content. */
+fun PanelConfig.setCardHeight(cardId: String, heightDp: Int): PanelConfig = mapCard(cardId) {
+    when (it) {
+        is TextCard -> it.copy(heightDp = heightDp.coerceIn(CARD_HEIGHT_RANGE))
+        is NoteCard -> it.copy(heightDp = heightDp.coerceIn(CARD_HEIGHT_RANGE))
+        is WidgetCard -> it.copy(heightDp = heightDp.coerceIn(WIDGET_HEIGHT_RANGE))
+        else -> it
+    }
 }
 
 /** Widget ids still used by a card; any other id the panel's widget host holds can be freed. */
@@ -56,12 +89,33 @@ fun PanelConfig.moveItem(cardId: String, from: Int, to: Int): PanelConfig = mapC
     if (it is GridCard) it.copy(items = it.items.move(from, to)) else it
 }
 
+/** Changes the name shown under one icon of a grid card. */
+fun PanelConfig.renameItem(cardId: String, index: Int, label: String): PanelConfig = mapCard(cardId) { card ->
+    if (card !is GridCard) return@mapCard card
+    card.copy(items = card.items.mapIndexed { i, item ->
+        if (i != index) {
+            item
+        } else {
+            when (item) {
+                is AppItem -> item.copy(label = label)
+                is LinkItem -> item.copy(label = label)
+                is ActionItem -> item.copy(label = label)
+            }
+        }
+    })
+}
+
 fun PanelConfig.removeItem(cardId: String, index: Int): PanelConfig = mapCard(cardId) {
     if (it is GridCard) it.copy(items = it.items.filterIndexed { i, _ -> i != index }) else it
 }
 
 fun PanelConfig.setNoteText(cardId: String, text: String): PanelConfig = mapCard(cardId) {
     if (it is NoteCard) it.copy(text = text) else it
+}
+
+/** Changes a text card's text or look; the size is kept within [TEXT_SIZE_RANGE]. */
+fun PanelConfig.updateTextCard(cardId: String, transform: (TextCard) -> TextCard): PanelConfig = mapCard(cardId) {
+    if (it is TextCard) transform(it).let { card -> card.copy(textSize = card.textSize.coerceIn(TEXT_SIZE_RANGE)) } else it
 }
 
 private fun PanelConfig.mapCard(cardId: String, transform: (Card) -> Card): PanelConfig =

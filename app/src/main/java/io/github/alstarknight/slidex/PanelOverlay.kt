@@ -42,6 +42,8 @@ fun PanelOverlay(
     visibleState: MutableTransitionState<Boolean>,
     side: Side,
     widthFraction: Float,
+    /** How dark the screen behind the panel gets, from 0 to 1. */
+    scrimAlpha: Float,
     seeThroughAllowed: Boolean,
     onDismiss: () -> Unit,
     onHidden: () -> Unit,
@@ -64,7 +66,7 @@ fun PanelOverlay(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = progress.value * (1f - fade) }
-                .background(Color.Black.copy(alpha = 0.35f))
+                .background(Color.Black.copy(alpha = scrimAlpha))
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -87,7 +89,9 @@ fun PanelOverlay(
             } else {
                 RoundedCornerShape(topStart = inner, bottomStart = inner)
             },
-            color = MaterialTheme.colorScheme.surfaceContainer,
+            // Every page paints its own background, so pages can look different.
+            color = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurface,
         ) {
             CompositionLocalProvider(LocalPanelSeeThrough provides setSeeThrough) {
                 content()

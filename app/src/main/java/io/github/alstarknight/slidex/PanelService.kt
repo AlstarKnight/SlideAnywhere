@@ -217,6 +217,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             side = side,
             initialPage = page,
             widthFraction = prefs.panelWidthPercent / 100f,
+            scrimAlpha = prefs.scrimPercent / 100f,
             blurBehind = prefs.panelBlur,
             seeThroughOnBrightness = prefs.brightnessSeeThrough,
             store = ConfigStore.get(this),
@@ -224,6 +225,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             onOpenSettings = {
                 startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             },
+            onOpenPageStyle = { page -> startActivity(MainActivity.pageStyleIntent(this, page)) },
             onClosed = {
                 panel = null
                 updateTriggerVisibility()

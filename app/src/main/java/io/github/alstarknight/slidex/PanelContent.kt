@@ -3,6 +3,7 @@ package io.github.alstarknight.slidex
 import android.appwidget.AppWidgetManager
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,13 +19,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -43,6 +49,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -79,13 +86,18 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
+import androidx.core.graphics.toColorInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -97,6 +109,7 @@ fun PanelContent(
     launcher: ItemLauncher,
     initialPage: Int,
     onOpenSettings: () -> Unit,
+    onOpenPageStyle: (page: Int) -> Unit,
     onClose: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -104,155 +117,154 @@ fun PanelContent(
     val switches by launcher.switches.collectAsState()
     var editing by remember { mutableStateOf(false) }
     var addingToCard by remember { mutableStateOf<String?>(null) }
+    // The icon being renamed: its card's id and its index in the card.
+    var renamingItem by remember { mutableStateOf<Pair<String, Int>?>(null) }
     var showingDrawer by remember { mutableStateOf(false) }
     val pagerState = rememberPagerState(initialPage.coerceIn(0, config.pages.lastIndex)) { config.pages.size }
     val scope = rememberCoroutineScope()
-    val extras = LocalThemeExtras.current
+    // The look chosen in the settings; a page can have a look of its own on top of it.
+    val baseTheme = LocalThemeExtras.current
 
     LaunchedEffect(Unit) { launcher.refreshSwitches() }
     BackHandler(enabled = editing) { editing = false }
 
     Box(Modifier.fillMaxSize()) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .safeDrawingPadding(),
-        ) {
-            Row(
-                Modifier
-                    .drawBehind { if (extras.stars) drawStars() }
-                    .padding(start = 16.dp, end = 4.dp, top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(R.string.app_name),
-                    style = extras.titleBrush?.let { MaterialTheme.typography.titleLarge.copy(brush = it) }
-                        ?: MaterialTheme.typography.titleLarge,
-                )
-                Spacer(Modifier.weight(1f))
-                if (config.pages.size > 1) {
-                    Text(
-                        "${pagerState.currentPage + 1} / ${config.pages.size}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                IconButton(onClick = { editing = !editing }) {
-                    Icon(
-                        if (editing) Icons.Default.Check else Icons.Default.Edit,
-                        contentDescription = stringResource(if (editing) R.string.edit_done else R.string.edit_start),
-                    )
-                }
-                IconButton(onClick = onOpenSettings) {
-                    Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.panel_open_settings))
-                }
-            }
-            if (editing) {
-                Text(
-                    stringResource(R.string.edit_drag_hint),
-                    Modifier.padding(horizontal = 16.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { pageIndex ->
-                val page = config.pages.getOrNull(pageIndex) ?: return@HorizontalPager
-                val listState = rememberLazyListState()
-                val drag = remember(listState) { CardDrag(listState) }
-                val cardIds by rememberUpdatedState(page.cards.map { it.id })
-                val shownCards = if (drag.cardId == null) {
-                    page.cards
-                } else {
-                    drag.order.mapNotNull { id -> page.cards.firstOrNull { it.id == id } }
-                }
-                LazyColumn(
-                    Modifier.fillMaxSize(),
-                    state = listState,
-                    contentPadding = PaddingValues(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    items(shownCards, key = { it.id }) { card ->
-                        PanelCard(
-                            card = card,
-                            modifier = if (card.id == drag.cardId) {
-                                Modifier
-                                    .zIndex(1f)
-                                    .graphicsLayer { translationY = drag.offsetOf(card.id) }
-                            } else {
-                                Modifier.animateItem()
-                            },
-                            dragHandle = Modifier.pointerInput(card.id) {
-                                detectDragGestures(
-                                    onDragStart = { drag.start(card.id, cardIds) },
-                                    onDragEnd = {
-                                        drag.end()?.let { (id, offset) -> store.update { it.moveCard(id, offset) } }
-                                    },
-                                    onDragCancel = drag::cancel,
-                                    onDrag = { change, amount ->
-                                        change.consume()
-                                        drag.drag(amount.y)
-                                    },
-                                )
-                            },
-                            editing = editing,
-                            switches = switches,
-                            onStartEditing = { editing = true },
-                            onLaunch = { item ->
-                                when {
-                                    item is ActionItem && item.action == Action.APP_DRAWER -> showingDrawer = true
-                                    !launcher.launch(item) -> onClose()
-                                }
-                            },
-                            store = store,
-                            onAddItem = { addingToCard = card.id },
-                            onClose = onClose,
-                        )
-                    }
-                    if (shownCards.isEmpty() && !editing) {
-                        item { EmptyPageHint() }
-                    }
-                    if (editing) {
-                        item {
-                            PageEditor(
-                                canDelete = config.pages.size > 1,
-                                canMoveLeft = pageIndex > 0,
-                                canMoveRight = pageIndex < config.pages.size - 1,
-                                onAddGrid = {
-                                    val title = it
-                                    store.update { c -> c.addCard(pageIndex, GridCard(ConfigStore.newId(), title)) }
-                                },
-                                onAddNote = {
-                                    val title = it
-                                    store.update { c -> c.addCard(pageIndex, NoteCard(ConfigStore.newId(), title)) }
-                                },
-                                onAddSystem = { kind, title ->
-                                    store.update { c -> c.addCard(pageIndex, SystemCard(ConfigStore.newId(), title, kind)) }
-                                },
-                                onAddUsage = { kind, title ->
-                                    store.update { c -> c.addCard(pageIndex, UsageCard(ConfigStore.newId(), title, kind)) }
-                                },
-                                onAddWidget = {
-                                    val intent = WidgetPickerActivity.intent(context, pageIndex)
-                                    context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                                    onClose()
-                                },
-                                onAddPage = {
-                                    store.update { it.addPage() }
-                                    scope.launch { pagerState.animateScrollToPage(config.pages.size) }
-                                },
-                                onDeletePage = {
-                                    store.update { it.removePage(pageIndex) }
-                                    WidgetHost.deleteUnused(context, store.config.value)
-                                },
-                                onMovePage = { offset ->
-                                    store.update { it.movePage(pageIndex, offset) }
-                                    scope.launch { pagerState.scrollToPage(pageIndex + offset) }
-                                },
+        // Every page brings its own background, which slides in and out with it.
+        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { pageIndex ->
+            val page = config.pages.getOrNull(pageIndex) ?: return@HorizontalPager
+            PageTheme(page.style, baseTheme) {
+                Box(Modifier.fillMaxSize()) {
+                    PageBackground(page.style)
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            .safeDrawingPadding(),
+                    ) {
+                        // Room for the header, which stays in place above the pages.
+                        Spacer(Modifier.height(HEADER_HEIGHT))
+                        if (editing) {
+                            Text(
+                                stringResource(R.string.edit_drag_hint),
+                                Modifier.padding(horizontal = 16.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                        }
+                        val listState = rememberLazyListState()
+                        val drag = remember(listState) { CardDrag(listState) }
+                        val cardIds by rememberUpdatedState(page.cards.map { it.id })
+                        val shownCards = if (drag.cardId == null) {
+                            page.cards
+                        } else {
+                            drag.order.mapNotNull { id -> page.cards.firstOrNull { it.id == id } }
+                        }
+                        LazyColumn(
+                            Modifier.fillMaxSize(),
+                            state = listState,
+                            contentPadding = PaddingValues(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            items(shownCards, key = { it.id }) { card ->
+                                PanelCard(
+                                    card = card,
+                                    modifier = if (card.id == drag.cardId) {
+                                        Modifier
+                                            .zIndex(1f)
+                                            .graphicsLayer { translationY = drag.offsetOf(card.id) }
+                                    } else {
+                                        Modifier.animateItem()
+                                    },
+                                    dragHandle = Modifier.pointerInput(card.id) {
+                                        detectDragGestures(
+                                            onDragStart = { drag.start(card.id, cardIds) },
+                                            onDragEnd = {
+                                                drag.end()?.let { (id, offset) -> store.update { it.moveCard(id, offset) } }
+                                            },
+                                            onDragCancel = drag::cancel,
+                                            onDrag = { change, amount ->
+                                                change.consume()
+                                                drag.drag(amount.y)
+                                            },
+                                        )
+                                    },
+                                    editing = editing,
+                                    switches = switches,
+                                    onStartEditing = { editing = true },
+                                    onLaunch = { item ->
+                                        when {
+                                            item is ActionItem && item.action == Action.APP_DRAWER -> showingDrawer = true
+                                            !launcher.launch(item) -> onClose()
+                                        }
+                                    },
+                                    store = store,
+                                    onAddItem = { addingToCard = card.id },
+                                    onRenameItem = { index -> renamingItem = card.id to index },
+                                    onClose = onClose,
+                                    cardOpacity = 1f - page.style.cardTransparency.coerceIn(TRANSPARENCY_RANGE) / 100f,
+                                )
+                            }
+                            if (shownCards.isEmpty() && !editing) {
+                                item { EmptyPageHint() }
+                            }
+                            if (editing) {
+                                item {
+                                    PageEditor(
+                                        canDelete = config.pages.size > 1,
+                                        canMoveLeft = pageIndex > 0,
+                                        canMoveRight = pageIndex < config.pages.size - 1,
+                                        onAddGrid = {
+                                            val title = it
+                                            store.update { c -> c.addCard(pageIndex, GridCard(ConfigStore.newId(), title)) }
+                                        },
+                                        onAddNote = {
+                                            val title = it
+                                            store.update { c -> c.addCard(pageIndex, NoteCard(ConfigStore.newId(), title)) }
+                                        },
+                                        onAddText = {
+                                            val title = it
+                                            store.update { c -> c.addCard(pageIndex, TextCard(ConfigStore.newId(), title)) }
+                                        },
+                                        onAddSystem = { kind, title ->
+                                            store.update { c -> c.addCard(pageIndex, SystemCard(ConfigStore.newId(), title, kind)) }
+                                        },
+                                        onAddUsage = { kind, title ->
+                                            store.update { c -> c.addCard(pageIndex, UsageCard(ConfigStore.newId(), title, kind)) }
+                                        },
+                                        onAddWidget = {
+                                            val intent = WidgetPickerActivity.intent(context, pageIndex)
+                                            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                                            onClose()
+                                        },
+                                        onAddPage = {
+                                            store.update { it.addPage() }
+                                            scope.launch { pagerState.animateScrollToPage(config.pages.size) }
+                                        },
+                                        onDeletePage = {
+                                            store.update { it.removePage(pageIndex) }
+                                            WidgetHost.deleteUnused(context, store.config.value)
+                                            BackgroundImages.deleteUnused(context, store.config.value)
+                                        },
+                                        onMovePage = { offset ->
+                                            store.update { it.movePage(pageIndex, offset) }
+                                            scope.launch { pagerState.scrollToPage(pageIndex + offset) }
+                                        },
+                                        onOpenStyle = { onOpenPageStyle(pageIndex) },
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
+        }
+        // The header takes the look of the page in view.
+        PageTheme(config.pages.getOrNull(pagerState.currentPage)?.style ?: PageStyle(), baseTheme) {
+            PanelHeader(
+                pageLabel = if (config.pages.size > 1) "${pagerState.currentPage + 1} / ${config.pages.size}" else null,
+                editing = editing,
+                onToggleEditing = { editing = !editing },
+                onOpenSettings = onOpenSettings,
+            )
         }
         if (showingDrawer) {
             AppDrawer(
@@ -272,7 +284,108 @@ fun PanelContent(
                 onDismiss = { addingToCard = null },
             )
         }
+        renamingItem?.let { (cardId, index) ->
+            val card = config.pages.flatMap { it.cards }.firstOrNull { it.id == cardId } as? GridCard
+            val item = card?.items?.getOrNull(index)
+            if (item != null) {
+                RenameItemDialog(
+                    label = item.label,
+                    onRename = { label ->
+                        store.update { it.renameItem(cardId, index, label) }
+                        renamingItem = null
+                    },
+                    onDismiss = { renamingItem = null },
+                )
+            }
+        }
     }
+}
+
+/** Asks for an icon's new name over the panel; the panel is a window of its own, so this is not a dialog window. */
+@Composable
+private fun RenameItemDialog(label: String, onRename: (String) -> Unit, onDismiss: () -> Unit) {
+    var text by remember { mutableStateOf(label) }
+    BackHandler(onBack = onDismiss)
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.4f))
+            .pointerInput(Unit) { detectTapGestures { onDismiss() } },
+        contentAlignment = Alignment.Center,
+    ) {
+        Card(
+            Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
+                // Taps on the card stay on it instead of closing it.
+                .pointerInput(Unit) { detectTapGestures() },
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.item_rename), style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { onRename(text.trim()) }),
+                )
+                Row(Modifier.align(Alignment.End)) {
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+                    TextButton(onClick = { onRename(text.trim()) }) { Text(stringResource(R.string.done)) }
+                }
+            }
+        }
+    }
+}
+
+/** The title row above the pages, with the page number and the edit and settings buttons. */
+@Composable
+private fun PanelHeader(pageLabel: String?, editing: Boolean, onToggleEditing: () -> Unit, onOpenSettings: () -> Unit) {
+    val extras = LocalThemeExtras.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+            .height(HEADER_HEIGHT)
+            .drawBehind { if (extras.stars) drawStars() }
+            .padding(start = 16.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            stringResource(R.string.app_name),
+            style = extras.titleBrush?.let { MaterialTheme.typography.titleLarge.copy(brush = it) }
+                ?: MaterialTheme.typography.titleLarge,
+        )
+        Spacer(Modifier.weight(1f))
+        if (pageLabel != null) {
+            Text(
+                pageLabel,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        IconButton(onClick = onToggleEditing) {
+            Icon(
+                if (editing) Icons.Default.Check else Icons.Default.Edit,
+                contentDescription = stringResource(if (editing) R.string.edit_done else R.string.edit_start),
+            )
+        }
+        IconButton(onClick = onOpenSettings) {
+            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.panel_open_settings))
+        }
+    }
+}
+
+private val HEADER_HEIGHT = 56.dp
+
+/** The page's theme color or picture, as see-through as the page is set to be. */
+@Composable
+private fun PageBackground(style: PageStyle) {
+    val color = MaterialTheme.colorScheme.surfaceContainer
+    val picture = style.background?.let { rememberBackground(it) }
+    val opacity = 1f - style.backgroundTransparency.coerceIn(TRANSPARENCY_RANGE) / 100f
+    Canvas(Modifier.fillMaxSize()) { drawPageBackground(color, picture, style.backgroundFit, opacity) }
 }
 
 @Composable
@@ -296,11 +409,27 @@ private fun PanelCard(
     onLaunch: (Item) -> Unit,
     store: ConfigStore,
     onAddItem: () -> Unit,
+    onRenameItem: (index: Int) -> Unit,
     onClose: () -> Unit,
+    cardOpacity: Float,
 ) {
-    Card(modifier.fillMaxWidth(), border = LocalThemeExtras.current.cardBorder) {
+    // Outside edit mode a text card is only its text, straight on the page unless it asks for a card.
+    if (card is TextCard && !editing && !card.cardBackground) {
+        CardText(card, onStartEditing, modifier.padding(horizontal = 12.dp))
+        return
+    }
+    val colors = MaterialTheme.colorScheme
+    Card(
+        modifier.fillMaxWidth(),
+        // The text color is given too: it cannot be worked out from a see-through card color.
+        colors = CardDefaults.cardColors(
+            containerColor = colors.surfaceContainerHighest.copy(alpha = cardOpacity),
+            contentColor = colors.onSurface,
+        ),
+        border = LocalThemeExtras.current.cardBorder,
+    ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            CardHeader(card, editing, dragHandle, onStartEditing, store)
+            if (editing || card.showTitle) CardHeader(card, editing, dragHandle, onStartEditing, store)
             when (card) {
                 is GridCard -> {
                     if (editing) ColumnsStepper(card.columns) { n -> store.update { it.setColumns(card.id, n) } }
@@ -313,9 +442,12 @@ private fun PanelCard(
                         onRemove = { index -> store.update { it.removeItem(card.id, index) } },
                         onAdd = onAddItem,
                         onMove = { from, to -> store.update { it.moveItem(card.id, from, to) } },
+                        onEdit = onRenameItem,
+                        showLabels = card.showLabels,
                     )
                 }
                 is NoteCard -> NoteField(card, store)
+                is TextCard -> if (editing) TextCardEditor(card, store) else CardText(card, onStartEditing)
                 is SystemCard -> SystemCardContent(card.kind, onClose)
                 is UsageCard -> UsageCardContent(card, editing, store, onLaunch, onClose)
                 is WidgetCard -> WidgetCardContent(card, editing, store, onClose)
@@ -366,6 +498,7 @@ private fun UsageCardContent(
         onLaunch = onLaunch,
         onRemove = {},
         onAdd = {},
+        showLabels = card.showLabels,
     )
 }
 
@@ -378,7 +511,7 @@ private fun WidgetCardContent(card: WidgetCard, editing: Boolean, store: ConfigS
     if (editing) {
         val text = stringResource(R.string.widget_height, card.heightDp)
         Stepper(text, card.heightDp, WIDGET_HEIGHT_RANGE, WIDGET_HEIGHT_STEP) { dp ->
-            store.update { it.setWidgetHeight(card.id, dp) }
+            store.update { it.setCardHeight(card.id, dp) }
         }
     }
     val info = remember(card.widgetId) { AppWidgetManager.getInstance(context).getAppWidgetInfo(card.widgetId) }
@@ -407,8 +540,6 @@ private fun WidgetCardContent(card: WidgetCard, editing: Boolean, store: ConfigS
         )
     }
 }
-
-private const val WIDGET_HEIGHT_STEP = 20
 
 /** Calls [onTap] after a tap anywhere inside, without taking the touch from the views underneath. */
 private fun Modifier.observeTaps(onTap: () -> Unit) = pointerInput(onTap) {
@@ -525,6 +656,9 @@ private fun ItemGrid(
     onRemove: (Int) -> Unit,
     onAdd: () -> Unit,
     onMove: (from: Int, to: Int) -> Unit = { _, _ -> },
+    /** Called with an icon's index when it is tapped in edit mode. */
+    onEdit: (Int) -> Unit = {},
+    showLabels: Boolean = true,
 ) {
     // In edit mode an icon can be long-pressed and dragged: dragFrom is its index, dragOffset how far it has moved.
     var dragFrom by remember { mutableStateOf<Int?>(null) }
@@ -611,7 +745,14 @@ private fun ItemGrid(
                             iconSize = iconSize,
                             switchedOn = action?.takeIf { it in SWITCH_ACTIONS }?.let { it in switches },
                             editing = editing,
-                            onClick = { onLaunch(item) },
+                            showLabel = showLabels,
+                            onClick = {
+                                when {
+                                    !editing -> onLaunch(item)
+                                    // Letting go of an icon picked up to drag is not a tap on it.
+                                    dragFrom == null -> onEdit(index)
+                                }
+                            },
                             onRemove = { onRemove(index) },
                             modifier = if (!dragged) cellModifier else {
                                 // Drawn in the cell it would drop into, shifted back under the finger.
@@ -642,6 +783,7 @@ private fun ItemCell(
     iconSize: Dp,
     switchedOn: Boolean?,
     editing: Boolean,
+    showLabel: Boolean,
     onClick: () -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier,
@@ -649,7 +791,7 @@ private fun ItemCell(
     Column(
         modifier
             .clip(RoundedCornerShape(12.dp))
-            .clickable(enabled = !editing, onClick = onClick)
+            .clickable(onClick = onClick)
             .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -675,13 +817,15 @@ private fun ItemCell(
                 }
             }
         }
-        Text(
-            item.label,
-            Modifier.padding(top = 4.dp, start = 2.dp, end = 2.dp),
-            style = MaterialTheme.typography.labelMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        if (showLabel) {
+            Text(
+                item.label,
+                Modifier.padding(top = 4.dp, start = 2.dp, end = 2.dp),
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -773,13 +917,83 @@ private fun NoteField(card: NoteCard, store: ConfigStore) {
         },
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 8.dp),
+            .padding(bottom = 8.dp)
+            .cardHeight(card.heightDp),
         placeholder = { Text(stringResource(R.string.note_placeholder)) },
         colors = TextFieldDefaults.colors(
             focusedContainerColor = Color.Transparent,
             unfocusedContainerColor = Color.Transparent,
         ),
     )
+}
+
+/** A fixed height, or the content's own height for [AUTO_HEIGHT]. */
+private fun Modifier.cardHeight(heightDp: Int) = if (heightDp == AUTO_HEIGHT) this else height(heightDp.dp)
+
+/** A text card's text, in the card's size, style and color; a long press on it starts edit mode. */
+@Composable
+private fun CardText(card: TextCard, onStartEditing: () -> Unit, modifier: Modifier = Modifier) {
+    val empty = card.text.isEmpty()
+    Box(
+        modifier
+            .fillMaxWidth()
+            .cardHeight(card.heightDp)
+            .pointerInput(Unit) { detectTapGestures(onLongPress = { onStartEditing() }) },
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            if (empty) stringResource(R.string.text_card_empty) else card.text,
+            Modifier.fillMaxWidth(),
+            color = if (empty) MaterialTheme.colorScheme.onSurfaceVariant else textColor(card),
+            overflow = TextOverflow.Ellipsis,
+            style = if (empty) MaterialTheme.typography.bodyMedium else cardTextStyle(card),
+        )
+    }
+}
+
+/** A text card in edit mode: its text in a field, in the card's size and style. */
+@Composable
+private fun TextCardEditor(card: TextCard, store: ConfigStore) {
+    var text by remember(card.id) { mutableStateOf(card.text) }
+    TextField(
+        value = text,
+        onValueChange = {
+            text = it
+            store.update { c -> c.updateTextCard(card.id) { t -> t.copy(text = it) } }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        // The theme's text color, since the card's own may not show on the card behind it.
+        textStyle = cardTextStyle(card),
+        placeholder = { Text(stringResource(R.string.text_card_hint)) },
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+        ),
+    )
+}
+
+@Composable
+private fun cardTextStyle(card: TextCard) = MaterialTheme.typography.bodyLarge.copy(
+    fontSize = card.textSize.sp,
+    lineHeight = (card.textSize * 1.4f).sp,
+    fontWeight = if (card.bold) FontWeight.Bold else FontWeight.Normal,
+    fontStyle = if (card.italic) FontStyle.Italic else FontStyle.Normal,
+    textAlign = if (card.centered) TextAlign.Center else TextAlign.Start,
+)
+
+/** The card's own text color, or the theme's when it has none or it is not a color. */
+@Composable
+private fun textColor(card: TextCard): Color {
+    val own = card.color?.let {
+        try {
+            Color(it.toColorInt())
+        } catch (e: IllegalArgumentException) {
+            null
+        }
+    }
+    return own ?: MaterialTheme.colorScheme.onSurface
 }
 
 @Composable
@@ -789,15 +1003,18 @@ private fun PageEditor(
     canMoveRight: Boolean,
     onAddGrid: (String) -> Unit,
     onAddNote: (String) -> Unit,
+    onAddText: (String) -> Unit,
     onAddSystem: (SystemKind, String) -> Unit,
     onAddUsage: (UsageKind, String) -> Unit,
     onAddWidget: () -> Unit,
     onAddPage: () -> Unit,
     onDeletePage: () -> Unit,
     onMovePage: (Int) -> Unit,
+    onOpenStyle: () -> Unit,
 ) {
     val gridTitle = stringResource(R.string.new_grid_card_title)
     val noteTitle = stringResource(R.string.default_card_note)
+    val textTitle = stringResource(R.string.default_card_text)
     val systemTitles = SystemKind.entries.associateWith { stringResource(it.labelRes) }
     val recentTitle = stringResource(R.string.usage_recent)
     val frequentTitle = stringResource(R.string.usage_frequent)
@@ -816,7 +1033,10 @@ private fun PageEditor(
             R.string.page_add_recent_card to { onAddUsage(UsageKind.RECENT, recentTitle) },
             R.string.page_add_frequent_card to { onAddUsage(UsageKind.FREQUENT, frequentTitle) },
         )
-        ButtonRow(R.string.page_add_widget_card to onAddWidget)
+        ButtonRow(
+            R.string.page_add_text_card to { onAddText(textTitle) },
+            R.string.page_add_widget_card to onAddWidget,
+        )
         ButtonRow(
             R.string.page_add to onAddPage,
             R.string.page_delete to onDeletePage.takeIf { canDelete },
@@ -825,6 +1045,7 @@ private fun PageEditor(
             R.string.page_move_left to { onMovePage(-1) }.takeIf { canMoveLeft },
             R.string.page_move_right to { onMovePage(1) }.takeIf { canMoveRight },
         )
+        ButtonRow(R.string.page_style to onOpenStyle)
     }
 }
 

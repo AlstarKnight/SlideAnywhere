@@ -68,6 +68,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_PANEL_BLUR, false)
         set(value) = prefs.edit { putBoolean(KEY_PANEL_BLUR, value) }
 
+    /** How much the screen behind the open panel is darkened, in percent. */
+    var scrimPercent: Int
+        get() = prefs.getInt(KEY_SCRIM, 35)
+        set(value) = prefs.edit { putInt(KEY_SCRIM, value) }
+
     /** Fade the panel out while the brightness slider is dragged, to show the new brightness behind it. */
     var brightnessSeeThrough: Boolean
         get() = prefs.getBoolean(KEY_BRIGHTNESS_SEE_THROUGH, true)
@@ -150,6 +155,7 @@ class Prefs(context: Context) {
         const val KEY_SHOW_HANDLE = "show_handle"
         const val KEY_PANEL_WIDTH = "panel_width"
         const val KEY_PANEL_BLUR = "panel_blur"
+        const val KEY_SCRIM = "scrim"
         const val KEY_BRIGHTNESS_SEE_THROUGH = "brightness_see_through"
         const val KEY_LISTED_APPS = "hidden_apps"
         const val KEY_APP_LIST_MODE = "app_list_mode"

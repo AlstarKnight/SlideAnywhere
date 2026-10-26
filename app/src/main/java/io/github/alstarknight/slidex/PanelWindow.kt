@@ -29,11 +29,13 @@ class PanelWindow(
     private val side: Side,
     private val initialPage: Int,
     private val widthFraction: Float,
+    private val scrimAlpha: Float,
     private val blurBehind: Boolean,
     private val seeThroughOnBrightness: Boolean,
     private val store: ConfigStore,
     private val launcher: ItemLauncher,
     private val onOpenSettings: () -> Unit,
+    private val onOpenPageStyle: (page: Int) -> Unit,
     private val onClosed: () -> Unit,
 ) {
     private val owner = OverlayLifecycleOwner()
@@ -54,6 +56,7 @@ class PanelWindow(
                         visibleState = visibleState,
                         side = side,
                         widthFraction = widthFraction,
+                        scrimAlpha = scrimAlpha,
                         seeThroughAllowed = seeThroughOnBrightness,
                         onDismiss = ::hide,
                         onHidden = ::remove,
@@ -65,6 +68,10 @@ class PanelWindow(
                             onOpenSettings = {
                                 hide()
                                 onOpenSettings()
+                            },
+                            onOpenPageStyle = { page ->
+                                hide()
+                                onOpenPageStyle(page)
                             },
                             onClose = ::hide,
                         )
