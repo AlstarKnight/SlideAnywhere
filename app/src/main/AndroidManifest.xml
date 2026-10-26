@@ -17,6 +17,10 @@
     <uses-permission
         android:name="android.permission.WRITE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
+    <!-- Recent and frequent app cards; the user grants it on a system page. -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
     <!-- App cards list and open any installed app, like a launcher. -->
     <uses-permission
         android:name="android.permission.QUERY_ALL_PACKAGES"

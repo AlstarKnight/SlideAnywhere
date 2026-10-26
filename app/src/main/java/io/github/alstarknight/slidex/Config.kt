@@ -43,6 +43,19 @@ data class SystemCard(override val id: String, override val title: String, val k
 @Serializable
 enum class SystemKind { BATTERY, BRIGHTNESS, VOLUME, STORAGE }
 
+/** Apps taken from the usage history: the most recently used or the most used ones. */
+@Serializable
+@SerialName("usage")
+data class UsageCard(
+    override val id: String,
+    override val title: String,
+    val kind: UsageKind,
+    val columns: Int = DEFAULT_COLUMNS,
+) : Card
+
+@Serializable
+enum class UsageKind { RECENT, FREQUENT }
+
 @Serializable
 sealed interface Item {
     val label: String

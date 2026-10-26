@@ -191,6 +191,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             windowManager = windowManager,
             side = side,
             widthFraction = prefs.panelWidthPercent / 100f,
+            blurBehind = prefs.panelBlur,
             store = ConfigStore.get(this),
             launcher = launcher,
             onOpenSettings = {

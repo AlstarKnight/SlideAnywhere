@@ -28,6 +28,7 @@ class PanelWindow(
     private val windowManager: WindowManager,
     private val side: Side,
     private val widthFraction: Float,
+    private val blurBehind: Boolean,
     private val store: ConfigStore,
     private val launcher: ItemLauncher,
     private val onOpenSettings: () -> Unit,
@@ -108,6 +109,14 @@ class PanelWindow(
         }
         // Let the panel's text fields bring up the keyboard and stay above it.
         softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        if (blurBehind && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            flags = flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+            blurBehindRadius = (BLUR_RADIUS_DP * context.resources.displayMetrics.density).toInt()
+        }
+    }
+
+    private companion object {
+        const val BLUR_RADIUS_DP = 24
     }
 }
 

@@ -1,5 +1,6 @@
 package io.github.alstarknight.slidex
 
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -166,6 +167,9 @@ fun PanelContent(store: ConfigStore, launcher: ItemLauncher, onOpenSettings: () 
                                 onAddSystem = { kind, title ->
                                     store.update { c -> c.addCard(pageIndex, SystemCard(ConfigStore.newId(), title, kind)) }
                                 },
+                                onAddUsage = { kind, title ->
+                                    store.update { c -> c.addCard(pageIndex, UsageCard(ConfigStore.newId(), title, kind)) }
+                                },
                                 onAddPage = {
                                     store.update { it.addPage() }
                                     scope.launch { pagerState.animateScrollToPage(config.pages.size) }
@@ -241,10 +245,58 @@ private fun PanelCard(
                 }
                 is NoteCard -> NoteField(card, store)
                 is SystemCard -> SystemCardContent(card.kind, onClose)
+                is UsageCard -> UsageCardContent(card, editing, store, onLaunch, onClose)
             }
         }
     }
 }
+
+/** Recently or frequently used apps; asks for usage access first. */
+@Composable
+private fun UsageCardContent(
+    card: UsageCard,
+    editing: Boolean,
+    store: ConfigStore,
+    onLaunch: (Item) -> Unit,
+    onClose: () -> Unit,
+) {
+    val context = LocalContext.current
+    if (editing) ColumnsStepper(card.columns) { n -> store.update { it.setColumns(card.id, n) } }
+    if (!UsageApps.hasAccess(context)) {
+        Box(Modifier.padding(bottom = 12.dp)) {
+            PermissionHint(R.string.needs_usage_access) {
+                context.startActivity(UsageApps.settingsIntent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                onClose()
+            }
+        }
+        return
+    }
+    val count = card.columns * USAGE_ROWS
+    val apps by produceState<List<AppItem>?>(null, card.kind, count) {
+        value = withContext(Dispatchers.IO) { UsageApps.load(context, card.kind, count) }
+    }
+    val list = apps ?: return
+    if (list.isEmpty()) {
+        Text(
+            stringResource(R.string.usage_empty),
+            Modifier.padding(bottom = 8.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    ItemGrid(
+        items = list,
+        columns = card.columns,
+        editing = false,
+        switches = emptySet(),
+        onLaunch = onLaunch,
+        onRemove = {},
+        onAdd = {},
+    )
+}
+
+private const val USAGE_ROWS = 2
 
 @Composable
 private fun ColumnsStepper(columns: Int, onChange: (Int) -> Unit) {
@@ -520,6 +572,7 @@ private fun PageEditor(
     onAddGrid: (String) -> Unit,
     onAddNote: (String) -> Unit,
     onAddSystem: (SystemKind, String) -> Unit,
+    onAddUsage: (UsageKind, String) -> Unit,
     onAddPage: () -> Unit,
     onDeletePage: () -> Unit,
     onMovePage: (Int) -> Unit,
@@ -527,6 +580,8 @@ private fun PageEditor(
     val gridTitle = stringResource(R.string.new_grid_card_title)
     val noteTitle = stringResource(R.string.default_card_note)
     val systemTitles = SystemKind.entries.associateWith { stringResource(it.labelRes) }
+    val recentTitle = stringResource(R.string.usage_recent)
+    val frequentTitle = stringResource(R.string.usage_frequent)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ButtonRow(
             R.string.page_add_grid_card to { onAddGrid(gridTitle) },
@@ -538,6 +593,10 @@ private fun PageEditor(
                 second.addLabelRes to { onAddSystem(second, systemTitles.getValue(second)) },
             )
         }
+        ButtonRow(
+            R.string.page_add_recent_card to { onAddUsage(UsageKind.RECENT, recentTitle) },
+            R.string.page_add_frequent_card to { onAddUsage(UsageKind.FREQUENT, frequentTitle) },
+        )
         ButtonRow(
             R.string.page_add to onAddPage,
             R.string.page_delete to onDeletePage.takeIf { canDelete },
@@ -557,11 +616,11 @@ private val SystemKind.addLabelRes: Int
         SystemKind.STORAGE -> R.string.page_add_storage_card
     }
 
-/** Two equal-width buttons; a null action shows the button disabled. */
+/** Equal-width buttons; a null action shows the button disabled. */
 @Composable
-private fun ButtonRow(first: Pair<Int, (() -> Unit)?>, second: Pair<Int, (() -> Unit)?>) {
+private fun ButtonRow(vararg buttons: Pair<Int, (() -> Unit)?>) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf(first, second).forEach { (label, action) ->
+        buttons.forEach { (label, action) ->
             OutlinedButton(
                 onClick = { action?.invoke() },
                 enabled = action != null,

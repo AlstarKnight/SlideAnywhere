@@ -26,11 +26,16 @@ fun PanelConfig.renameCard(cardId: String, title: String): PanelConfig = mapCard
         is GridCard -> it.copy(title = title)
         is NoteCard -> it.copy(title = title)
         is SystemCard -> it.copy(title = title)
+        is UsageCard -> it.copy(title = title)
     }
 }
 
 fun PanelConfig.setColumns(cardId: String, columns: Int): PanelConfig = mapCard(cardId) {
-    if (it is GridCard) it.copy(columns = columns.coerceIn(COLUMN_RANGE)) else it
+    when (it) {
+        is GridCard -> it.copy(columns = columns.coerceIn(COLUMN_RANGE))
+        is UsageCard -> it.copy(columns = columns.coerceIn(COLUMN_RANGE))
+        else -> it
+    }
 }
 
 fun PanelConfig.addItem(cardId: String, item: Item): PanelConfig = mapCard(cardId) {

@@ -100,4 +100,14 @@ class ConfigTest {
         assertEquals(withSystem, parseConfig(withSystem.toJson()))
         assertEquals("电池", withSystem.renameCard("s", "电池").pages[1].cards[0].title)
     }
+
+    @Test
+    fun usageCardsRoundTripRenameAndChangeColumns() {
+        val recent = UsageCard("u", "最近使用", UsageKind.RECENT)
+        val withUsage = config.addCard(1, recent)
+        assertEquals(withUsage, parseConfig(withUsage.toJson()))
+        assertEquals("最近", withUsage.renameCard("u", "最近").pages[1].cards[0].title)
+        assertEquals(5, (withUsage.setColumns("u", 5).pages[1].cards[0] as UsageCard).columns)
+        assertEquals(COLUMN_RANGE.last, (withUsage.setColumns("u", 9).pages[1].cards[0] as UsageCard).columns)
+    }
 }

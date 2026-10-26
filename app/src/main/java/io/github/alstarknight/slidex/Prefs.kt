@@ -42,6 +42,11 @@ class Prefs(context: Context) {
         get() = prefs.getInt(KEY_PANEL_WIDTH, 85)
         set(value) = prefs.edit { putInt(KEY_PANEL_WIDTH, value) }
 
+    /** Blur what is behind the panel (Android 12+). */
+    var panelBlur: Boolean
+        get() = prefs.getBoolean(KEY_PANEL_BLUR, false)
+        set(value) = prefs.edit { putBoolean(KEY_PANEL_BLUR, value) }
+
     var triggerMode: TriggerMode
         get() = enumPref(KEY_TRIGGER_MODE, TriggerMode.EDGE)
         set(value) = prefs.edit { putString(KEY_TRIGGER_MODE, value.name) }
@@ -113,6 +118,7 @@ class Prefs(context: Context) {
         const val KEY_HANDLE_WIDTH = "handle_width"
         const val KEY_SHOW_HANDLE = "show_handle"
         const val KEY_PANEL_WIDTH = "panel_width"
+        const val KEY_PANEL_BLUR = "panel_blur"
         const val KEY_TRIGGER_MODE = "trigger_mode"
         const val KEY_BALL_SHAPE = "ball_shape"
         const val KEY_BALL_SIZE = "ball_size"

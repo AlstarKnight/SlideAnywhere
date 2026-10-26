@@ -67,6 +67,7 @@ fun SettingsScreen(prefs: Prefs) {
     var accessibilityEnabled by remember { mutableStateOf(false) }
     var writeSettingsGranted by remember { mutableStateOf(false) }
     var dndAccessGranted by remember { mutableStateOf(false) }
+    var usageAccessGranted by remember { mutableStateOf(false) }
     var serviceEnabled by remember { mutableStateOf(prefs.serviceEnabled) }
 
     LifecycleResumeEffect(Unit) {
@@ -77,6 +78,7 @@ fun SettingsScreen(prefs: Prefs) {
         accessibilityEnabled = ActionAccessibilityService.isEnabled(context)
         writeSettingsGranted = Settings.System.canWrite(context)
         dndAccessGranted = context.getSystemService(NotificationManager::class.java).isNotificationPolicyAccessGranted
+        usageAccessGranted = UsageApps.hasAccess(context)
         // Covers returning from the overlay permission screen and the service having been killed.
         if (prefs.serviceEnabled && overlayGranted) PanelService.start(context)
         onPauseOrDispose {}
@@ -173,6 +175,11 @@ fun SettingsScreen(prefs: Prefs) {
                     granted = dndAccessGranted,
                 ) { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) }
                 PermissionRow(
+                    title = stringResource(R.string.permission_usage),
+                    description = stringResource(R.string.permission_usage_desc),
+                    granted = usageAccessGranted,
+                ) { context.startActivity(UsageApps.settingsIntent()) }
+                PermissionRow(
                     title = stringResource(R.string.permission_battery),
                     description = stringResource(R.string.permission_battery_desc),
                     granted = batteryUnrestricted,
@@ -219,6 +226,15 @@ fun SettingsScreen(prefs: Prefs) {
             Section {
                 SliderRow(stringResource(R.string.setting_panel_width), "%", prefs.panelWidthPercent, 50..100) {
                     prefs.panelWidthPercent = it
+                }
+                // Blurring what is behind a window needs Android 12.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    var blur by remember { mutableStateOf(prefs.panelBlur) }
+                    SwitchRow(stringResource(R.string.setting_panel_blur), blur) {
+                        blur = it
+                        prefs.panelBlur = it
+                    }
+                    Hint(stringResource(R.string.panel_blur_hint))
                 }
             }
 
