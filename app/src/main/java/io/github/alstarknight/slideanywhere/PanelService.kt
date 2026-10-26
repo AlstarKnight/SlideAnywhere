@@ -26,6 +26,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
 
     private lateinit var prefs: Prefs
     private lateinit var windowManager: WindowManager
+    private lateinit var launcher: ItemLauncher
     private var handle: EdgeHandleView? = null
     private var panel: PanelWindow? = null
 
@@ -35,6 +36,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
         super.onCreate()
         prefs = Prefs(this)
         windowManager = getSystemService(WindowManager::class.java)
+        launcher = ItemLauncher(this)
         // Add the overlay before going foreground: Android 15 only lets an overlay app start a
         // foreground service from the background while one of its overlay windows is visible.
         if (Settings.canDrawOverlays(this)) addHandle()
@@ -67,6 +69,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
         panel?.remove()
         handle?.let { windowManager.removeView(it) }
         handle = null
+        launcher.release()
         super.onDestroy()
     }
 
@@ -132,6 +135,8 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             windowManager = windowManager,
             side = prefs.side,
             widthFraction = prefs.panelWidthPercent / 100f,
+            store = ConfigStore.get(this),
+            launcher = launcher,
             onOpenSettings = {
                 startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             },

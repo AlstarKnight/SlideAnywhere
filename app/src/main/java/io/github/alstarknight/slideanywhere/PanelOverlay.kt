@@ -7,21 +7,13 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -30,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.first
 
@@ -40,8 +31,8 @@ fun PanelOverlay(
     side: Side,
     widthFraction: Float,
     onDismiss: () -> Unit,
-    onOpenSettings: () -> Unit,
     onHidden: () -> Unit,
+    content: @Composable () -> Unit,
 ) {
     val transition = updateTransition(visibleState, label = "panel")
     val progress = transition.animateFloat(label = "progress", transitionSpec = { tween(220) }) { if (it) 1f else 0f }
@@ -80,30 +71,7 @@ fun PanelOverlay(
             },
             color = MaterialTheme.colorScheme.surfaceContainer,
         ) {
-            PanelContent(onOpenSettings)
-        }
-    }
-}
-
-@Composable
-private fun PanelContent(onOpenSettings: () -> Unit) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .safeDrawingPadding()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(R.string.panel_empty_title), style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(R.string.panel_empty_body), style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-        Spacer(Modifier.weight(1f))
-        TextButton(onClick = onOpenSettings, modifier = Modifier.align(Alignment.End)) {
-            Text(stringResource(R.string.panel_open_settings))
+            content()
         }
     }
 }

@@ -9,6 +9,9 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
+import androidx.activity.OnBackPressedDispatcher
+import androidx.activity.OnBackPressedDispatcherOwner
+import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.Lifecycle
@@ -25,6 +28,8 @@ class PanelWindow(
     private val windowManager: WindowManager,
     private val side: Side,
     private val widthFraction: Float,
+    private val store: ConfigStore,
+    private val launcher: ItemLauncher,
     private val onOpenSettings: () -> Unit,
     private val onClosed: () -> Unit,
 ) {
@@ -34,9 +39,10 @@ class PanelWindow(
 
     fun show() {
         owner.start()
-        val root = PanelRootView(context, onBack = ::hide)
+        val root = PanelRootView(context, onBack = ::onBack)
         root.setViewTreeLifecycleOwner(owner)
         root.setViewTreeSavedStateRegistryOwner(owner)
+        root.setViewTreeOnBackPressedDispatcherOwner(owner)
         root.addView(ComposeView(context).apply {
             setContent {
                 AppTheme {
@@ -45,17 +51,32 @@ class PanelWindow(
                         side = side,
                         widthFraction = widthFraction,
                         onDismiss = ::hide,
-                        onOpenSettings = {
-                            hide()
-                            onOpenSettings()
-                        },
                         onHidden = ::remove,
-                    )
+                    ) {
+                        PanelContent(
+                            store = store,
+                            launcher = launcher,
+                            onOpenSettings = {
+                                hide()
+                                onOpenSettings()
+                            },
+                            onClose = ::hide,
+                        )
+                    }
                 }
             }
         })
         windowManager.addView(root, layoutParams())
         this.root = root
+    }
+
+    /** Back first goes to the panel's own handlers (closing a sheet, leaving edit mode), then closes the panel. */
+    private fun onBack() {
+        if (owner.onBackPressedDispatcher.hasEnabledCallbacks()) {
+            owner.onBackPressedDispatcher.onBackPressed()
+        } else {
+            hide()
+        }
     }
 
     /** Starts the closing animation; the window is removed once it finishes. */
@@ -85,6 +106,8 @@ class PanelWindow(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             setFitInsetsTypes(0)
         }
+        // Let the panel's text fields bring up the keyboard and stay above it.
+        softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
     }
 }
 
@@ -123,13 +146,14 @@ private class PanelRootView(context: Context, private val onBack: () -> Unit) : 
     }
 }
 
-/** Lifecycle and saved-state owner that Compose needs when it runs outside an activity. */
-private class OverlayLifecycleOwner : SavedStateRegistryOwner {
+/** Lifecycle, saved-state and back-dispatcher owner that Compose needs when it runs outside an activity. */
+private class OverlayLifecycleOwner : SavedStateRegistryOwner, OnBackPressedDispatcherOwner {
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val savedStateController = SavedStateRegistryController.create(this)
 
     override val lifecycle: Lifecycle get() = lifecycleRegistry
     override val savedStateRegistry: SavedStateRegistry get() = savedStateController.savedStateRegistry
+    override val onBackPressedDispatcher = OnBackPressedDispatcher()
 
     fun start() {
         savedStateController.performRestore(null)

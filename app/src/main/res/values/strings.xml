@@ -11,6 +11,8 @@
     <string name="permission_notifications_desc">显示常驻通知，点击通知也能打开面板</string>
     <string name="permission_battery">忽略电池优化</string>
     <string name="permission_battery_desc">尽量避免后台被系统关闭</string>
+    <string name="permission_accessibility">无障碍服务</string>
+    <string name="permission_accessibility_desc">锁屏、截屏、通知栏、最近任务、分屏等快捷方式需要。开不了的话，先到系统的应用信息页，在右上角菜单里选「允许受限设置」</string>
     <string name="permission_granted">已开启</string>
     <string name="permission_grant">去开启</string>
 
@@ -26,9 +28,72 @@
     <string name="section_panel">面板</string>
     <string name="setting_panel_width">负一屏宽度</string>
 
-    <string name="panel_empty_title">还没有卡片</string>
-    <string name="panel_empty_body">应用、快捷方式、网址和便签卡片会在下一版加入。</string>
     <string name="panel_open_settings">设置</string>
+    <string name="panel_empty_page">这一页还没有卡片。点右上角的编辑按钮或长按卡片标题，可以添加卡片。</string>
+    <string name="edit_start">编辑</string>
+    <string name="edit_done">完成</string>
+    <string name="cancel">取消</string>
+
+    <string name="default_card_apps">应用</string>
+    <string name="default_card_shortcuts">快捷方式</string>
+    <string name="default_card_note">便签</string>
+    <string name="new_grid_card_title">新卡片</string>
+
+    <string name="card_move_up">上移</string>
+    <string name="card_move_down">下移</string>
+    <string name="card_rename">重命名</string>
+    <string name="card_delete">删除卡片</string>
+    <string name="card_empty">还没有图标，进入编辑模式后点「添加」。</string>
+    <string name="item_add">添加</string>
+    <string name="item_remove">移除</string>
+    <string name="note_placeholder">点击可输入便签</string>
+
+    <string name="page_add_grid_card">添加图标卡片</string>
+    <string name="page_add_note_card">添加便签</string>
+    <string name="page_add">新建一页</string>
+    <string name="page_delete">删除该页</string>
+    <string name="page_move_left">向左移动</string>
+    <string name="page_move_right">向右移动</string>
+
+    <string name="add_tab_apps">应用</string>
+    <string name="add_tab_actions">快捷方式</string>
+    <string name="add_tab_link">网址 / URI</string>
+    <string name="search_apps">搜索应用</string>
+    <string name="link_label">名称</string>
+    <string name="link_uri">网址或 URI</string>
+    <string name="link_uri_hint">支持 https://、应用 Scheme（如 alipays://）和 intent: URI</string>
+
+    <string name="action_notifications">通知栏</string>
+    <string name="action_quick_settings">快捷设置</string>
+    <string name="action_recents">最近任务</string>
+    <string name="action_home">主屏幕</string>
+    <string name="action_back">返回</string>
+    <string name="action_lock_screen">锁屏</string>
+    <string name="action_screenshot">截屏</string>
+    <string name="action_split_screen">分屏</string>
+    <string name="action_play_pause">播放/暂停</string>
+    <string name="action_next_track">下一首</string>
+    <string name="action_previous_track">上一首</string>
+    <string name="action_volume_up">音量加</string>
+    <string name="action_volume_down">音量减</string>
+    <string name="action_flashlight">手电筒</string>
+    <string name="action_voice_assistant">语音助手</string>
+    <string name="action_needs_accessibility">请先开启 SlideAnywhere 的无障碍服务</string>
+    <string name="action_needs_android_9">仅支持 Android 9 及以上的系统</string>
+    <string name="action_failed">操作失败</string>
+    <string name="launch_failed">无法打开</string>
+
+    <string name="accessibility_label">SlideAnywhere 快捷操作</string>
+    <string name="accessibility_description">用于执行快捷方式卡片里的锁屏、截屏、打开通知栏、最近任务、分屏等系统操作。不读取屏幕内容。</string>
+
+    <string name="section_config">配置</string>
+    <string name="config_export">导出配置</string>
+    <string name="config_import">导入配置</string>
+    <string name="config_exported">配置已导出</string>
+    <string name="config_imported">配置已导入</string>
+    <string name="config_import_confirm">导入会替换当前所有页面和卡片，确定继续吗？</string>
+    <string name="config_invalid">不是有效的配置文件</string>
+    <string name="config_io_failed">读写文件失败</string>
 
     <string name="notification_channel">常驻服务</string>
     <string name="notification_title">全局负一屏运行中</string>

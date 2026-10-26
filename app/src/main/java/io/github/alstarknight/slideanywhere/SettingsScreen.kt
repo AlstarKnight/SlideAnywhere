@@ -5,9 +5,11 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +30,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import java.io.IOException
 import kotlin.math.roundToInt
 
 @Composable
@@ -48,6 +53,7 @@ fun SettingsScreen(prefs: Prefs) {
     var overlayGranted by remember { mutableStateOf(false) }
     var notificationsGranted by remember { mutableStateOf(false) }
     var batteryUnrestricted by remember { mutableStateOf(false) }
+    var accessibilityEnabled by remember { mutableStateOf(false) }
     var serviceEnabled by remember { mutableStateOf(prefs.serviceEnabled) }
 
     LifecycleResumeEffect(Unit) {
@@ -55,6 +61,7 @@ fun SettingsScreen(prefs: Prefs) {
         notificationsGranted = hasNotificationPermission(context)
         batteryUnrestricted = context.getSystemService(PowerManager::class.java)
             .isIgnoringBatteryOptimizations(context.packageName)
+        accessibilityEnabled = ActionAccessibilityService.isEnabled(context)
         // Covers returning from the overlay permission screen and the service having been killed.
         if (prefs.serviceEnabled && overlayGranted) PanelService.start(context)
         onPauseOrDispose {}
@@ -62,6 +69,30 @@ fun SettingsScreen(prefs: Prefs) {
 
     val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         notificationsGranted = it
+    }
+    val store = remember { ConfigStore.get(context) }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) {
+        if (it != null) toast(context, exportConfig(context, it, store.config.value))
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {
+        if (it != null) toast(context, importConfig(context, it, store))
+    }
+    var confirmImport by remember { mutableStateOf(false) }
+
+    if (confirmImport) {
+        AlertDialog(
+            onDismissRequest = { confirmImport = false },
+            text = { Text(stringResource(R.string.config_import_confirm)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmImport = false
+                    importLauncher.launch(arrayOf("*/*"))
+                }) { Text(stringResource(R.string.config_import)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmImport = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
     }
 
     Surface(Modifier.fillMaxSize()) {
@@ -100,6 +131,11 @@ fun SettingsScreen(prefs: Prefs) {
                         granted = notificationsGranted,
                     ) { notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }
                 }
+                PermissionRow(
+                    title = stringResource(R.string.permission_accessibility),
+                    description = stringResource(R.string.permission_accessibility_desc),
+                    granted = accessibilityEnabled,
+                ) { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
                 PermissionRow(
                     title = stringResource(R.string.permission_battery),
                     description = stringResource(R.string.permission_battery_desc),
@@ -144,6 +180,18 @@ fun SettingsScreen(prefs: Prefs) {
             Section {
                 SliderRow(stringResource(R.string.setting_panel_width), "%", prefs.panelWidthPercent, 50..100) {
                     prefs.panelWidthPercent = it
+                }
+            }
+
+            SectionTitle(stringResource(R.string.section_config))
+            Section {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { exportLauncher.launch("slideanywhere-config.json") }, modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.config_export))
+                    }
+                    OutlinedButton(onClick = { confirmImport = true }, modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.config_import))
+                    }
                 }
             }
         }
@@ -221,3 +269,32 @@ private fun overlaySettingsIntent(context: Context) =
 @SuppressLint("BatteryLife")
 private fun batteryOptimizationIntent(context: Context) =
     Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, "package:${context.packageName}".toUri())
+
+private fun toast(context: Context, message: Int) {
+    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+}
+
+/** Writes the config to a user-picked file; returns the message to show. */
+private fun exportConfig(context: Context, uri: Uri, config: PanelConfig): Int {
+    try {
+        val stream = context.contentResolver.openOutputStream(uri) ?: return R.string.config_io_failed
+        stream.use { it.write(config.toJson().encodeToByteArray()) }
+        return R.string.config_exported
+    } catch (e: IOException) {
+        return R.string.config_io_failed
+    }
+}
+
+/** Replaces the config with a user-picked file; returns the message to show. */
+private fun importConfig(context: Context, uri: Uri, store: ConfigStore): Int {
+    try {
+        val stream = context.contentResolver.openInputStream(uri) ?: return R.string.config_io_failed
+        val config = parseConfig(stream.use { it.readBytes().decodeToString() })
+        store.update { config }
+        return R.string.config_imported
+    } catch (e: IOException) {
+        return R.string.config_io_failed
+    } catch (e: IllegalArgumentException) {
+        return R.string.config_invalid
+    }
+}
