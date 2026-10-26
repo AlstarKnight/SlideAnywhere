@@ -6,7 +6,7 @@ plugins {
 
 // Release signing comes from CI secrets (see .github/workflows/android.yml); without them
 // only the debug build is installable.
-val signingStoreFile: String? = System.getenv("SIGNING_STORE_FILE")
+val signingStoreFile: String? = System.getenv("ANDROID_KEYSTORE_FILE")
 
 android {
     namespace = "io.github.alstarknight.slideanywhere"
@@ -24,9 +24,9 @@ android {
         signingStoreFile?.let { path ->
             create("release") {
                 storeFile = file(path)
-                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
-                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
-                keyPassword = System.getenv("SIGNING_STORE_PASSWORD")
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
             }
         }
     }

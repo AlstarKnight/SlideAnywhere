@@ -15,7 +15,7 @@
 
 每次推送后 GitHub Actions 会编译 APK：打开仓库的 Actions 页面，进入最新一次 Android CI 下载。
 
-- `slideanywhere-release-apk`：用固定密钥签名，可以覆盖升级，日常安装用这个。需要在仓库 Secrets 里配置 `SIGNING_KEYSTORE_BASE64`、`SIGNING_STORE_PASSWORD`、`SIGNING_KEY_ALIAS` 后才会生成。
+- `slideanywhere-release-apk`：用固定密钥签名，可以覆盖升级，日常安装用这个。需要在仓库 Secrets 里配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD` 后才会生成。
 - `slideanywhere-debug-apk`：每次签名都不同，升级前要先卸载旧版。
 
 首次打开后先开启「悬浮窗」权限，再打开「启用全局负一屏」开关。
