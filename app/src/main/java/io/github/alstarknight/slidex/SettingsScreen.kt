@@ -34,6 +34,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -134,6 +135,12 @@ fun SettingsScreen(prefs: Prefs) {
                         else -> context.startActivity(overlaySettingsIntent(context))
                     }
                 }
+                var showNotification by remember { mutableStateOf(prefs.showNotification) }
+                SwitchRow(stringResource(R.string.setting_show_notification), showNotification) {
+                    showNotification = it
+                    prefs.showNotification = it
+                }
+                Hint(stringResource(R.string.show_notification_hint))
             }
 
             SectionTitle(stringResource(R.string.section_permissions))
@@ -252,6 +259,7 @@ private fun EdgeHandleSettings(prefs: Prefs) {
         showHandle = it
         prefs.showHandle = it
     }
+    Hint(stringResource(R.string.handle_drag_hint))
 }
 
 @Composable
@@ -269,11 +277,70 @@ private fun FloatingBallSettings(prefs: Prefs) {
     SliderRow(stringResource(R.string.setting_ball_opacity), "%", prefs.ballOpacityPercent, 30..100) {
         prefs.ballOpacityPercent = it
     }
-    Text(
-        stringResource(R.string.ball_hint),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    var tapAction by remember { mutableStateOf(prefs.ballTapAction) }
+    ActionChoice(stringResource(R.string.setting_ball_tap), tapAction) {
+        tapAction = it
+        prefs.ballTapAction = it
+    }
+    var longPressAction by remember { mutableStateOf(prefs.ballLongPressAction) }
+    ActionChoice(stringResource(R.string.setting_ball_long_press), longPressAction) {
+        longPressAction = it
+        prefs.ballLongPressAction = it
+    }
+    Hint(stringResource(R.string.ball_hint))
+}
+
+/** A row showing what a gesture does; tapping it lists "open the panel" and every action to pick from. */
+@Composable
+private fun ActionChoice(title: String, selected: Action?, onSelect: (Action?) -> Unit) {
+    var picking by remember { mutableStateOf(false) }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable { picking = true }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, Modifier.weight(1f))
+        Text(actionLabel(selected), color = MaterialTheme.colorScheme.primary)
+    }
+    if (!picking) return
+    // The app drawer lives inside the panel, so it is not offered on its own.
+    val options = listOf<Action?>(null) + Action.entries.filter { it != Action.APP_DRAWER }
+    AlertDialog(
+        onDismissRequest = { picking = false },
+        title = { Text(title) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                options.forEach { option ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onSelect(option)
+                                picking = false
+                            }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = option == selected, onClick = null)
+                        Text(actionLabel(option), Modifier.padding(start = 12.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { picking = false }) { Text(stringResource(R.string.cancel)) }
+        },
     )
+}
+
+@Composable
+private fun actionLabel(action: Action?): String = stringResource(action?.labelRes ?: R.string.ball_action_panel)
+
+@Composable
+private fun Hint(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 /** One tile per preset, showing a swatch of its accent. */

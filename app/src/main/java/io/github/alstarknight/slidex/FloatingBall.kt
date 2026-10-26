@@ -1,6 +1,5 @@
 package io.github.alstarknight.slidex
 
-import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
@@ -14,21 +13,19 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
-import androidx.core.animation.doOnEnd
 import androidx.core.content.ContextCompat
 import kotlin.math.hypot
 import kotlin.math.roundToInt
 
-/** Draggable floating icon that opens the panel when tapped and snaps to the nearer side edge when dropped. */
+/** Floating icon that can be dragged anywhere; a tap or a long press opens the panel or runs an action. */
 class FloatingBall(
     context: Context,
     private val windowManager: WindowManager,
     private val prefs: Prefs,
-    private val onOpen: (Side) -> Unit,
+    private val onGesture: (action: Action?, side: Side) -> Unit,
 ) {
     private val density = context.resources.displayMetrics.density
-    private val margin = (4 * density).roundToInt()
-    private val view = BallView(context, onDragStart = ::onDragStart, onDrag = ::onDrag, onDrop = ::snap)
+    private val view = BallView(context, onDragStart = ::onDragStart, onDrag = ::onDrag, onDrop = ::onDrop)
     private val params = WindowManager.LayoutParams(
         0,
         0,
@@ -43,10 +40,13 @@ class FloatingBall(
     }
     private var dragStartX = 0
     private var dragStartY = 0
-    private var snapAnimator: ValueAnimator? = null
 
     init {
-        view.setOnClickListener { onOpen(prefs.ballSide) }
+        view.setOnClickListener { onGesture(prefs.ballTapAction, side) }
+        view.setOnLongClickListener {
+            onGesture(prefs.ballLongPressAction, side)
+            true
+        }
     }
 
     var visible: Boolean
@@ -55,6 +55,10 @@ class FloatingBall(
             view.visibility = if (value) View.VISIBLE else View.GONE
         }
 
+    /** The edge the icon is nearer to; the panel slides in from there. */
+    val side: Side
+        get() = nearestSide(params.x + params.width / 2f, windowManager.screenSize().x)
+
     fun add() {
         applyPrefs()
         windowManager.addView(view, params)
@@ -62,13 +66,12 @@ class FloatingBall(
 
     /** Re-reads size, shape, opacity and position, e.g. after a settings change or a rotation. */
     fun update() {
-        if (snapAnimator != null || view.dragging) return
+        if (view.dragging) return
         applyPrefs()
         windowManager.updateViewLayout(view, params)
     }
 
     fun remove() {
-        snapAnimator?.cancel()
         windowManager.removeView(view)
     }
 
@@ -77,14 +80,13 @@ class FloatingBall(
         val screen = windowManager.screenSize()
         params.width = size
         params.height = size
-        params.x = ballLeft(prefs.ballSide, screen.x, size, margin)
-        params.y = ballTop(screen.y, size, prefs.ballPosition)
+        params.x = centeredOffset(screen.x, size, prefs.ballX)
+        params.y = centeredOffset(screen.y, size, prefs.ballY)
         view.shape = prefs.ballShape
         view.alpha = prefs.ballOpacityPercent / 100f
     }
 
     private fun onDragStart() {
-        snapAnimator?.cancel()
         dragStartX = params.x
         dragStartY = params.y
     }
@@ -96,28 +98,13 @@ class FloatingBall(
         windowManager.updateViewLayout(view, params)
     }
 
-    /** Slides the icon to the nearer side edge, then remembers where it rests. */
-    private fun snap() {
+    /** Remembers where the icon was dropped, relative to the screen size so it survives rotation. */
+    private fun onDrop() {
         val screen = windowManager.screenSize()
-        val size = params.width
-        val side = nearestSide(params.x + size / 2f, screen.x)
-        snapAnimator = ValueAnimator.ofInt(params.x, ballLeft(side, screen.x, size, margin)).apply {
-            duration = SNAP_DURATION_MS
-            addUpdateListener {
-                params.x = it.animatedValue as Int
-                if (view.isAttachedToWindow) windowManager.updateViewLayout(view, params)
-            }
-            doOnEnd {
-                snapAnimator = null
-                prefs.ballSide = side
-                prefs.ballPosition = ballPosition(screen.y, size, params.y)
-            }
-            start()
-        }
-    }
-
-    private companion object {
-        const val SNAP_DURATION_MS = 200L
+        prefs.setBallPosition(
+            centerFraction(screen.x, params.width, params.x),
+            centerFraction(screen.y, params.height, params.y),
+        )
     }
 }
 
@@ -154,6 +141,11 @@ private class BallView(
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private var downX = 0f
     private var downY = 0f
+    private var longPressed = false
+    private val longPress = Runnable {
+        longPressed = true
+        performLongClick()
+    }
 
     init {
         contentDescription = context.getString(R.string.ball_description)
@@ -198,25 +190,35 @@ private class BallView(
                 downX = event.rawX
                 downY = event.rawY
                 dragging = false
+                longPressed = false
+                postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
             }
             MotionEvent.ACTION_MOVE -> {
                 val dx = event.rawX - downX
                 val dy = event.rawY - downY
-                if (!dragging && hypot(dx, dy) > touchSlop) {
+                if (!dragging && !longPressed && hypot(dx, dy) > touchSlop) {
+                    removeCallbacks(longPress)
                     dragging = true
                     onDragStart()
                 }
                 if (dragging) onDrag(dx, dy)
             }
-            MotionEvent.ACTION_UP -> if (dragging) {
-                dragging = false
-                onDrop()
-            } else {
-                performClick()
+            MotionEvent.ACTION_UP -> {
+                removeCallbacks(longPress)
+                when {
+                    dragging -> {
+                        dragging = false
+                        onDrop()
+                    }
+                    !longPressed -> performClick()
+                }
             }
-            MotionEvent.ACTION_CANCEL -> if (dragging) {
-                dragging = false
-                onDrop()
+            MotionEvent.ACTION_CANCEL -> {
+                removeCallbacks(longPress)
+                if (dragging) {
+                    dragging = false
+                    onDrop()
+                }
             }
         }
         return true

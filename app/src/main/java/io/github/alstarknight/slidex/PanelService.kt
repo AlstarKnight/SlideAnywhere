@@ -19,6 +19,7 @@ import android.view.View
 import android.view.WindowManager
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import kotlin.math.roundToInt
 
 /** Foreground service that keeps the edge handle or the floating icon on screen and opens the panel from it. */
 class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListener {
@@ -29,6 +30,9 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
     private var handle: EdgeHandleView? = null
     private var ball: FloatingBall? = null
     private var panel: PanelWindow? = null
+
+    /** Where the edge handle is being dragged to: its side and top, saved when it is let go. */
+    private var handleDrag: Pair<Side, Int>? = null
 
     override fun onBind(intent: Intent?) = null
 
@@ -44,15 +48,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        try {
-            ServiceCompat.startForeground(
-                this,
-                NOTIFICATION_ID,
-                buildNotification(),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
-            )
-        } catch (e: IllegalStateException) {
-            Log.w(TAG, "Cannot start in foreground", e)
+        if (prefs.showNotification && !startInForeground()) {
             stopSelf()
             return START_NOT_STICKY
         }
@@ -60,8 +56,21 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             stopSelf()
             return START_NOT_STICKY
         }
-        if (intent?.action == ACTION_OPEN_PANEL) openPanel(if (ball != null) prefs.ballSide else prefs.side)
+        if (intent?.action == ACTION_OPEN_PANEL) openPanel(ball?.side ?: prefs.side)
         return START_STICKY
+    }
+
+    private fun startInForeground(): Boolean = try {
+        ServiceCompat.startForeground(
+            this,
+            NOTIFICATION_ID,
+            buildNotification(),
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+        )
+        true
+    } catch (e: IllegalStateException) {
+        Log.w(TAG, "Cannot start in foreground", e)
+        false
     }
 
     override fun onDestroy() {
@@ -79,6 +88,14 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
     }
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
+        if (key == Prefs.KEY_SHOW_NOTIFICATION) {
+            if (prefs.showNotification) {
+                startInForeground()
+            } else {
+                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            }
+            return
+        }
         if ((prefs.triggerMode == TriggerMode.BALL) != (ball != null)) {
             removeTrigger()
             addTrigger()
@@ -91,8 +108,13 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
     private fun addTrigger() {
         when (prefs.triggerMode) {
             TriggerMode.EDGE -> addHandle()
-            TriggerMode.BALL -> ball = FloatingBall(this, windowManager, prefs, onOpen = ::openPanel).also { it.add() }
+            TriggerMode.BALL -> ball = FloatingBall(this, windowManager, prefs, onGesture = ::onBallGesture).also { it.add() }
         }
+    }
+
+    /** A tap or long press on the floating icon: null opens the panel, anything else runs that action. */
+    private fun onBallGesture(action: Action?, side: Side) {
+        if (action == null) openPanel(side) else launcher.launch(ActionItem(getString(action.labelRes), action))
     }
 
     private fun removeTrigger() {
@@ -103,14 +125,35 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
     }
 
     private fun addHandle() {
-        val view = EdgeHandleView(this, onOpen = { openPanel(prefs.side) })
+        val view = EdgeHandleView(this, onOpen = { openPanel(prefs.side) }, onMove = ::moveHandle, onMoveEnd = ::dropHandle)
         handle = view
         applyHandleStyle(view)
         windowManager.addView(view, handleLayoutParams())
     }
 
+    /** Follows a long-press drag of the handle: up and down, and over to whichever side the finger is nearer. */
+    private fun moveHandle(rawX: Float, rawY: Float) {
+        val view = handle ?: return
+        val screen = windowManager.screenSize()
+        val params = handleLayoutParams()
+        val side = nearestSide(rawX, screen.x)
+        params.gravity = Gravity.TOP or if (side == Side.LEFT) Gravity.LEFT else Gravity.RIGHT
+        params.y = (rawY - params.height / 2f).roundToInt().coerceIn(0, (screen.y - params.height).coerceAtLeast(0))
+        view.side = side
+        windowManager.updateViewLayout(view, params)
+        handleDrag = side to params.y
+    }
+
+    private fun dropHandle() {
+        val (side, top) = handleDrag ?: return
+        handleDrag = null
+        val height = handleLayoutParams().height
+        prefs.setHandlePlacement(side, handlePositionPercent(windowManager.screenSize().y, height, top))
+    }
+
     private fun updateHandle() {
         val view = handle ?: return
+        if (handleDrag != null) return
         applyHandleStyle(view)
         windowManager.updateViewLayout(view, handleLayoutParams())
     }
@@ -188,7 +231,17 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
         private const val ACTION_OPEN_PANEL = "io.github.alstarknight.slidex.OPEN_PANEL"
 
         fun start(context: Context) {
-            ContextCompat.startForegroundService(context, Intent(context, PanelService::class.java))
+            val intent = Intent(context, PanelService::class.java)
+            try {
+                if (Prefs(context).showNotification) {
+                    ContextCompat.startForegroundService(context, intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: IllegalStateException) {
+                // Android can refuse to start services from the background; opening the app starts it again.
+                Log.w(TAG, "Cannot start the service", e)
+            }
         }
 
         fun stop(context: Context) {

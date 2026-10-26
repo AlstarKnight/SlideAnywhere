@@ -3,6 +3,8 @@
     <string name="app_name">SlideX</string>
 
     <string name="setting_enable">启用全局负一屏</string>
+    <string name="setting_show_notification">显示常驻通知</string>
+    <string name="show_notification_hint">关闭后通知栏不再显示 SlideX，但后台更容易被系统清理。</string>
 
     <string name="section_permissions">权限</string>
     <string name="permission_overlay">悬浮窗</string>
@@ -36,7 +38,11 @@
     <string name="ball_square">方形</string>
     <string name="setting_ball_size">大小</string>
     <string name="setting_ball_opacity">不透明度</string>
-    <string name="ball_hint">拖动图标可以移动位置，松手后会贴到最近的屏幕边缘，面板从图标所在的一侧滑出。</string>
+    <string name="setting_ball_tap">点击图标</string>
+    <string name="setting_ball_long_press">长按图标</string>
+    <string name="ball_action_panel">打开面板</string>
+    <string name="ball_hint">拖动图标可以放到屏幕任意位置，面板从离图标较近的一侧滑出。</string>
+    <string name="handle_drag_hint">长按触发条约半秒，等它变亮后拖动，可以改变上下位置，拖过屏幕中线会换到另一侧。</string>
     <string name="ball_description">打开 SlideX 面板</string>
 
     <string name="section_theme">主题外观</string>

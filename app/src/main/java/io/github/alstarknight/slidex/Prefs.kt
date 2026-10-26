@@ -58,15 +58,34 @@ class Prefs(context: Context) {
         get() = prefs.getInt(KEY_BALL_OPACITY, 100)
         set(value) = prefs.edit { putInt(KEY_BALL_OPACITY, value) }
 
-    /** Screen edge the floating icon rests on; the panel slides in from this side too. */
-    var ballSide: Side
-        get() = enumPref(KEY_BALL_SIDE, Side.RIGHT)
-        set(value) = prefs.edit { putString(KEY_BALL_SIDE, value.name) }
+    /** Center of the floating icon, as fractions of the screen width and height. */
+    val ballX: Float get() = prefs.getFloat(KEY_BALL_X, 1f)
+    val ballY: Float get() = prefs.getFloat(KEY_BALL_Y, 0.6f)
 
-    /** Vertical center of the floating icon, as a fraction of the screen height. */
-    var ballPosition: Float
-        get() = prefs.getFloat(KEY_BALL_POSITION, 0.6f)
-        set(value) = prefs.edit { putFloat(KEY_BALL_POSITION, value) }
+    fun setBallPosition(x: Float, y: Float) = prefs.edit {
+        putFloat(KEY_BALL_X, x)
+        putFloat(KEY_BALL_Y, y)
+    }
+
+    /** What a tap on the floating icon does: null opens the panel, otherwise it runs that action. */
+    var ballTapAction: Action?
+        get() = actionPref(KEY_BALL_TAP)
+        set(value) = prefs.edit { putString(KEY_BALL_TAP, value?.name) }
+
+    var ballLongPressAction: Action?
+        get() = actionPref(KEY_BALL_LONG_PRESS)
+        set(value) = prefs.edit { putString(KEY_BALL_LONG_PRESS, value?.name) }
+
+    /** Moves the edge handle in one write, so it does not jump between the two values. */
+    fun setHandlePlacement(side: Side, positionPercent: Int) = prefs.edit {
+        putString(KEY_SIDE, side.name)
+        putInt(KEY_HANDLE_POSITION, positionPercent)
+    }
+
+    /** Whether the service shows its ongoing notification; without it the service is not a foreground service. */
+    var showNotification: Boolean
+        get() = prefs.getBoolean(KEY_SHOW_NOTIFICATION, true)
+        set(value) = prefs.edit { putBoolean(KEY_SHOW_NOTIFICATION, value) }
 
     var themePreset: ThemePreset
         get() = enumPref(KEY_THEME_PRESET, ThemePreset.STARRY)
@@ -75,6 +94,11 @@ class Prefs(context: Context) {
     var darkMode: DarkMode
         get() = enumPref(KEY_DARK_MODE, DarkMode.SYSTEM)
         set(value) = prefs.edit { putString(KEY_DARK_MODE, value.name) }
+
+    private fun actionPref(key: String): Action? {
+        val name = prefs.getString(key, null)
+        return Action.entries.firstOrNull { it.name == name }
+    }
 
     private inline fun <reified T : Enum<T>> enumPref(key: String, default: T): T {
         val name = prefs.getString(key, null)
@@ -93,8 +117,11 @@ class Prefs(context: Context) {
         const val KEY_BALL_SHAPE = "ball_shape"
         const val KEY_BALL_SIZE = "ball_size"
         const val KEY_BALL_OPACITY = "ball_opacity"
-        const val KEY_BALL_SIDE = "ball_side"
-        const val KEY_BALL_POSITION = "ball_position"
+        const val KEY_BALL_X = "ball_x"
+        const val KEY_BALL_Y = "ball_y"
+        const val KEY_BALL_TAP = "ball_tap"
+        const val KEY_BALL_LONG_PRESS = "ball_long_press"
+        const val KEY_SHOW_NOTIFICATION = "show_notification"
         const val KEY_THEME_PRESET = "theme_preset"
         const val KEY_DARK_MODE = "dark_mode"
     }

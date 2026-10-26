@@ -17,17 +17,17 @@ fun handleTop(screenHeight: Int, handleHeight: Int, positionPercent: Int): Int {
     return (center - handleHeight / 2).coerceIn(0, (screenHeight - handleHeight).coerceAtLeast(0))
 }
 
-/** The side edge nearer to a floating icon whose center is at [centerX]. */
-fun nearestSide(centerX: Float, screenWidth: Int): Side = if (centerX < screenWidth / 2f) Side.LEFT else Side.RIGHT
+/** Inverse of [handleTop]: where the handle's center is, in percent of the screen height. */
+fun handlePositionPercent(screenHeight: Int, handleHeight: Int, top: Int): Int =
+    if (screenHeight <= 0) 50 else ((top + handleHeight / 2f) * 100 / screenHeight).roundToInt().coerceIn(0, 100)
 
-/** Left of a floating icon of [size] resting on [side], [margin] away from that edge. */
-fun ballLeft(side: Side, screenWidth: Int, size: Int, margin: Int): Int =
-    if (side == Side.LEFT) margin else screenWidth - size - margin
+/** The side edge nearer to a point at [x], e.g. the center of the floating icon or a finger dragging the handle. */
+fun nearestSide(x: Float, screenWidth: Int): Side = if (x < screenWidth / 2f) Side.LEFT else Side.RIGHT
 
-/** Top of a floating icon whose center sits at [position] (0 to 1) of the screen height, kept fully on screen. */
-fun ballTop(screenHeight: Int, size: Int, position: Float): Int =
-    (screenHeight * position - size / 2f).roundToInt().coerceIn(0, (screenHeight - size).coerceAtLeast(0))
+/** Offset of something [size] long whose center sits at [fraction] (0 to 1) of [length], kept fully inside it. */
+fun centeredOffset(length: Int, size: Int, fraction: Float): Int =
+    (length * fraction - size / 2f).roundToInt().coerceIn(0, (length - size).coerceAtLeast(0))
 
-/** Inverse of [ballTop]: the fraction of the screen height where the icon's center is. */
-fun ballPosition(screenHeight: Int, size: Int, top: Int): Float =
-    if (screenHeight <= 0) 0.5f else ((top + size / 2f) / screenHeight).coerceIn(0f, 1f)
+/** Inverse of [centeredOffset]: where the center is, as a fraction of [length]. */
+fun centerFraction(length: Int, size: Int, offset: Int): Float =
+    if (length <= 0) 0.5f else ((offset + size / 2f) / length).coerceIn(0f, 1f)

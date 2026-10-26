@@ -50,22 +50,22 @@ class EdgeGeometryTest {
     }
 
     @Test
-    fun ballSnapsToNearerSide() {
-        assertEquals(Side.LEFT, nearestSide(centerX = 400f, screenWidth = 1000))
-        assertEquals(Side.RIGHT, nearestSide(centerX = 600f, screenWidth = 1000))
+    fun handlePositionIsTheInverseOfHandleTop() {
+        assertEquals(25, handlePositionPercent(screenHeight = 2000, handleHeight = 200, top = 400))
+        assertEquals(100, handlePositionPercent(screenHeight = 2000, handleHeight = 200, top = 2000))
     }
 
     @Test
-    fun ballRestsAgainstItsEdge() {
-        assertEquals(10, ballLeft(Side.LEFT, screenWidth = 1000, size = 100, margin = 10))
-        assertEquals(890, ballLeft(Side.RIGHT, screenWidth = 1000, size = 100, margin = 10))
+    fun nearestSideSplitsTheScreenInHalf() {
+        assertEquals(Side.LEFT, nearestSide(x = 400f, screenWidth = 1000))
+        assertEquals(Side.RIGHT, nearestSide(x = 600f, screenWidth = 1000))
     }
 
     @Test
     fun ballPositionRoundTripsAndStaysOnScreen() {
-        assertEquals(950, ballTop(screenHeight = 2000, size = 100, position = 0.5f))
-        assertEquals(0.5f, ballPosition(screenHeight = 2000, size = 100, top = 950), 0.0001f)
-        assertEquals(0, ballTop(screenHeight = 2000, size = 100, position = 0f))
-        assertEquals(1900, ballTop(screenHeight = 2000, size = 100, position = 1f))
+        assertEquals(950, centeredOffset(length = 2000, size = 100, fraction = 0.5f))
+        assertEquals(0.5f, centerFraction(length = 2000, size = 100, offset = 950), 0.0001f)
+        assertEquals(0, centeredOffset(length = 2000, size = 100, fraction = 0f))
+        assertEquals(1900, centeredOffset(length = 2000, size = 100, fraction = 1f))
     }
 }
