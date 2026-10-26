@@ -1,4 +1,4 @@
-package io.github.alstarknight.slideanywhere
+package io.github.alstarknight.slidex
 
 import android.content.ComponentName
 import android.content.Context

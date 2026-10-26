@@ -1,4 +1,4 @@
-package io.github.alstarknight.slideanywhere
+package io.github.alstarknight.slidex
 
 import android.annotation.SuppressLint
 import android.content.Context

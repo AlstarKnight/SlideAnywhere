@@ -10,11 +10,11 @@ plugins {
 val signingStoreFile: String? = System.getenv("ANDROID_KEYSTORE_FILE")
 
 android {
-    namespace = "io.github.alstarknight.slideanywhere"
+    namespace = "io.github.alstarknight.slidex"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "io.github.alstarknight.slideanywhere"
+        applicationId = "io.github.alstarknight.slidex"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

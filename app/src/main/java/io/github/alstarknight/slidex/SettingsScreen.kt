@@ -1,4 +1,4 @@
-package io.github.alstarknight.slideanywhere
+package io.github.alstarknight.slidex
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -186,7 +186,7 @@ fun SettingsScreen(prefs: Prefs) {
             SectionTitle(stringResource(R.string.section_config))
             Section {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { exportLauncher.launch("slideanywhere-config.json") }, modifier = Modifier.weight(1f)) {
+                    OutlinedButton(onClick = { exportLauncher.launch("slidex-config.json") }, modifier = Modifier.weight(1f)) {
                         Text(stringResource(R.string.config_export))
                     }
                     OutlinedButton(onClick = { confirmImport = true }, modifier = Modifier.weight(1f)) {

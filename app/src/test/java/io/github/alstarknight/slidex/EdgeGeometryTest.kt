@@ -1,4 +1,4 @@
-package io.github.alstarknight.slideanywhere
+package io.github.alstarknight.slidex
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

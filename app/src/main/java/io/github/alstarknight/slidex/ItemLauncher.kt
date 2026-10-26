@@ -1,4 +1,4 @@
-package io.github.alstarknight.slideanywhere
+package io.github.alstarknight.slidex
 
 import android.accessibilityservice.AccessibilityService
 import android.content.ActivityNotFoundException

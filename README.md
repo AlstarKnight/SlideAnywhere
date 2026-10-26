@@ -16,9 +16,9 @@
 
 每次推送后 GitHub Actions 会编译 APK：打开仓库的 Actions 页面，进入最新一次 Android CI 下载。
 
-- 固定下载链接（最近一次 CI 编译的签名版）：https://github.com/AlstarKnight/SlideAnywhere/releases/download/latest/SlideAnywhere.apk
-- `slideanywhere-release-apk`：用固定密钥签名，可以覆盖升级，日常安装用这个。需要在仓库 Secrets 里配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD` 后才会生成。
-- `slideanywhere-debug-apk`：每次签名都不同，升级前要先卸载旧版。
+- 固定下载链接（最近一次 CI 编译的签名版）：https://github.com/AlstarKnight/SlideAnywhere/releases/download/latest/SlideX.apk
+- `slidex-release-apk`：用固定密钥签名，可以覆盖升级，日常安装用这个。需要在仓库 Secrets 里配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD` 后才会生成。
+- `slidex-debug-apk`：每次签名都不同，升级前要先卸载旧版。
 
 首次打开后先开启「悬浮窗」权限，再打开「启用全局负一屏」开关。锁屏、截屏、通知栏等快捷方式还需要开启「无障碍服务」；Android 13 及以上侧载安装的应用，要先在系统的应用信息页右上角菜单里选「允许受限设置」。
 

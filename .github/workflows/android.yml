@@ -35,7 +35,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: slideanywhere-debug-apk
+          name: slidex-debug-apk
           path: app/build/outputs/apk/debug/*.apk
 
       - name: Signed release APK
@@ -52,11 +52,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: env.HAS_SIGNING_KEY == 'true'
         with:
-          name: slideanywhere-release-apk
+          name: slidex-release-apk
           path: app/build/outputs/apk/release/*.apk
 
       # Keeps one fixed download link for testers:
-      # https://github.com/<owner>/<repo>/releases/download/latest/SlideAnywhere.apk
+      # https://github.com/<owner>/<repo>/releases/download/latest/SlideX.apk
       - name: Update the "latest" pre-release
         if: env.HAS_SIGNING_KEY == 'true'
         env:
@@ -64,9 +64,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
           BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
-          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/SlideAnywhere.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/SlideX.apk"
           gh release delete latest --cleanup-tag --yes || true
-          gh release create latest "$RUNNER_TEMP/SlideAnywhere.apk" \
+          gh release create latest "$RUNNER_TEMP/SlideX.apk" \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "SlideX 最新测试版" \

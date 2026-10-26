@@ -1,4 +1,4 @@
-package io.github.alstarknight.slideanywhere
+package io.github.alstarknight.slidex
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -171,7 +171,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
         private const val TAG = "PanelService"
         private const val CHANNEL_ID = "service"
         private const val NOTIFICATION_ID = 1
-        private const val ACTION_OPEN_PANEL = "io.github.alstarknight.slideanywhere.OPEN_PANEL"
+        private const val ACTION_OPEN_PANEL = "io.github.alstarknight.slidex.OPEN_PANEL"
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, PanelService::class.java))

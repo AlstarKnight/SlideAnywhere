@@ -1,4 +1,4 @@
-package io.github.alstarknight.slideanywhere
+package io.github.alstarknight.slidex
 
 fun PanelConfig.addPage(): PanelConfig = copy(pages = pages + Page())
 
