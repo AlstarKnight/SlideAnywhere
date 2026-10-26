@@ -31,3 +31,10 @@ fun centeredOffset(length: Int, size: Int, fraction: Float): Int =
 /** Inverse of [centeredOffset]: where the center is, as a fraction of [length]. */
 fun centerFraction(length: Int, size: Int, offset: Int): Float =
     if (length <= 0) 0.5f else ((offset + size / 2f) / length).coerceIn(0f, 1f)
+
+/**
+ * Top of something [size] tall placed at [top], moved up to end [gap] above a keyboard whose top edge is at
+ * [keyboardTop] when it would otherwise overlap it. Null [keyboardTop] means no keyboard is shown.
+ */
+fun aboveKeyboard(top: Int, size: Int, keyboardTop: Int?, gap: Int): Int =
+    if (keyboardTop == null || top + size + gap <= keyboardTop) top else (keyboardTop - size - gap).coerceAtLeast(0)

@@ -428,7 +428,7 @@ private fun IconPackChoice(prefs: Prefs) {
 /** A row showing how many apps hide the trigger; tapping it opens the app list. */
 @Composable
 private fun HiddenAppsRow(prefs: Prefs) {
-    var hiddenApps by remember { mutableStateOf(prefs.hiddenApps) }
+    var hiddenApps by remember { mutableStateOf(prefs.listedApps) }
     var picking by remember { mutableStateOf(false) }
     Row(
         Modifier
@@ -452,7 +452,7 @@ private fun HiddenAppsRow(prefs: Prefs) {
             selected = hiddenApps,
             onDone = {
                 hiddenApps = it
-                prefs.hiddenApps = it
+                prefs.listedApps = it
                 picking = false
             },
             onDismiss = { picking = false },

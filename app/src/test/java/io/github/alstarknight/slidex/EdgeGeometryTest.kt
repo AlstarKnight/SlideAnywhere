@@ -68,4 +68,12 @@ class EdgeGeometryTest {
         assertEquals(0, centeredOffset(length = 2000, size = 100, fraction = 0f))
         assertEquals(1900, centeredOffset(length = 2000, size = 100, fraction = 1f))
     }
+
+    @Test
+    fun iconMovesAboveTheKeyboardOnlyWhenItWouldOverlap() {
+        assertEquals(1000, aboveKeyboard(top = 1000, size = 100, keyboardTop = null, gap = 20))
+        assertEquals(500, aboveKeyboard(top = 500, size = 100, keyboardTop = 1500, gap = 20))
+        assertEquals(1380, aboveKeyboard(top = 1600, size = 100, keyboardTop = 1500, gap = 20))
+        assertEquals(0, aboveKeyboard(top = 100, size = 100, keyboardTop = 50, gap = 20))
+    }
 }

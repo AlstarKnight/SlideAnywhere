@@ -50,6 +50,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
         if (Settings.canDrawOverlays(this)) addTrigger()
         prefs.prefs.registerOnSharedPreferenceChangeListener(this)
         scope.launch { ActionAccessibilityService.foregroundPackage.collect { updateTriggerVisibility() } }
+        scope.launch { ActionAccessibilityService.keyboardTop.collect { updateKeyboard() } }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -109,6 +110,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
         } else {
             updateHandle()
             ball?.update()
+            updateKeyboard()
             updateTriggerVisibility()
         }
     }
@@ -118,15 +120,20 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             TriggerMode.EDGE -> addHandle()
             TriggerMode.BALL -> ball = FloatingBall(this, windowManager, prefs, onGesture = ::onBallGesture).also { it.add() }
         }
+        updateKeyboard()
         updateTriggerVisibility()
     }
 
-    /** Shows the trigger unless the panel is open, a blacklisted app is in front, or it is hidden in landscape. */
+    private fun updateKeyboard() {
+        ball?.keyboardTop = ActionAccessibilityService.keyboardTop.value.takeIf { prefs.avoidKeyboard }
+    }
+
+    /** Shows the trigger unless the panel is open, the app list rules out the app in front, or it is landscape. */
     private fun updateTriggerVisibility() {
         val front = ActionAccessibilityService.foregroundPackage.value
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val visible = panel == null &&
-            (front == null || front !in prefs.hiddenApps) &&
+            triggerAllowedIn(front, prefs.appListMode, prefs.listedApps, packageName) &&
             !(landscape && prefs.hideInLandscape)
         handle?.visibility = if (visible) View.VISIBLE else View.GONE
         ball?.visible = visible

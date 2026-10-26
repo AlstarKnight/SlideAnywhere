@@ -5,14 +5,17 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Rect
 import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityWindowInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Performs system actions (lock screen, screenshot, notifications…) for shortcut items, and tracks which app is
- * in front so the trigger can hide in blacklisted apps. It never reads what is on the screen.
+ * Performs system actions (lock screen, screenshot, notifications…) for shortcut items, tracks which app is in
+ * front so the trigger can follow the app list, and where the keyboard is so the floating icon can move out of its
+ * way. It looks only at window types and positions, never at what windows show.
  */
 class ActionAccessibilityService : AccessibilityService() {
 
@@ -26,15 +29,31 @@ class ActionAccessibilityService : AccessibilityService() {
     override fun onUnbind(intent: Intent?): Boolean {
         instance = null
         foreground.value = null
+        keyboard.value = null
         return super.onUnbind(intent)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        when (event?.eventType) {
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                updateForeground(event)
+                updateKeyboard()
+            }
+            AccessibilityEvent.TYPE_WINDOWS_CHANGED -> updateKeyboard()
+        }
+    }
+
+    private fun updateForeground(event: AccessibilityEvent) {
         val packageName = event.packageName?.toString() ?: return
         val className = event.className?.toString() ?: return
         // Keyboards, popups and the notification shade change window state too; only an activity means another app.
         if (isActivity(packageName, className)) foreground.value = packageName
+    }
+
+    private fun updateKeyboard() {
+        val bounds = windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+            ?.let { window -> Rect().also(window::getBoundsInScreen) }
+        keyboard.value = bounds?.takeUnless { it.isEmpty }?.top
     }
 
     private fun isActivity(packageName: String, className: String): Boolean =
@@ -58,6 +77,11 @@ class ActionAccessibilityService : AccessibilityService() {
 
         /** Package of the app in front, or null while the service is off. */
         val foregroundPackage: StateFlow<String?> = foreground
+
+        private val keyboard = MutableStateFlow<Int?>(null)
+
+        /** Top edge of the on-screen keyboard in screen pixels, or null when none is shown or the service is off. */
+        val keyboardTop: StateFlow<Int?> = keyboard
 
         fun isEnabled(context: Context): Boolean {
             val enabled = Settings.Secure.getString(

@@ -42,10 +42,22 @@ class Prefs(context: Context) {
         get() = prefs.getInt(KEY_PANEL_WIDTH, 85)
         set(value) = prefs.edit { putInt(KEY_PANEL_WIDTH, value) }
 
-    /** Packages in which the trigger is hidden; telling which app is in front needs the accessibility service. */
-    var hiddenApps: Set<String>
-        get() = prefs.getStringSet(KEY_HIDDEN_APPS, null).orEmpty().toSet()
-        set(value) = prefs.edit { putStringSet(KEY_HIDDEN_APPS, value) }
+    /**
+     * Packages the trigger hides in, or with a whitelist the only ones it shows in. Telling which app is in front
+     * needs the accessibility service. Kept under the old blacklist key so an existing list carries over.
+     */
+    var listedApps: Set<String>
+        get() = prefs.getStringSet(KEY_LISTED_APPS, null).orEmpty().toSet()
+        set(value) = prefs.edit { putStringSet(KEY_LISTED_APPS, value) }
+
+    var appListMode: AppListMode
+        get() = enumPref(KEY_APP_LIST_MODE, AppListMode.BLACKLIST)
+        set(value) = prefs.edit { putString(KEY_APP_LIST_MODE, value.name) }
+
+    /** Move the floating icon above the keyboard while one is shown; needs the accessibility service. */
+    var avoidKeyboard: Boolean
+        get() = prefs.getBoolean(KEY_AVOID_KEYBOARD, true)
+        set(value) = prefs.edit { putBoolean(KEY_AVOID_KEYBOARD, value) }
 
     var hideInLandscape: Boolean
         get() = prefs.getBoolean(KEY_HIDE_IN_LANDSCAPE, false)
@@ -133,7 +145,9 @@ class Prefs(context: Context) {
         const val KEY_SHOW_HANDLE = "show_handle"
         const val KEY_PANEL_WIDTH = "panel_width"
         const val KEY_PANEL_BLUR = "panel_blur"
-        const val KEY_HIDDEN_APPS = "hidden_apps"
+        const val KEY_LISTED_APPS = "hidden_apps"
+        const val KEY_APP_LIST_MODE = "app_list_mode"
+        const val KEY_AVOID_KEYBOARD = "avoid_keyboard"
         const val KEY_HIDE_IN_LANDSCAPE = "hide_in_landscape"
         const val KEY_TRIGGER_MODE = "trigger_mode"
         const val KEY_BALL_SHAPE = "ball_shape"

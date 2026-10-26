@@ -14,7 +14,7 @@
     <string name="permission_battery">忽略电池优化</string>
     <string name="permission_battery_desc">尽量避免后台被系统关闭</string>
     <string name="permission_accessibility">无障碍服务</string>
-    <string name="permission_accessibility_desc">锁屏、截屏、通知栏、最近任务、分屏、电源菜单等快捷方式，以及按应用隐藏触发条需要。开不了的话，先到系统的应用信息页，在右上角菜单里选「允许受限设置」</string>
+    <string name="permission_accessibility_desc">锁屏、截屏、通知栏、最近任务、分屏、电源菜单等快捷方式，黑名单/白名单，以及悬浮图标避开键盘需要。开不了的话，先到系统的应用信息页，在右上角菜单里选「允许受限设置」</string>
     <string name="permission_write_settings">修改系统设置</string>
     <string name="permission_write_settings_desc">自动旋转、自动亮度开关和亮度条需要</string>
     <string name="permission_dnd">勿扰权限</string>
@@ -204,7 +204,7 @@
     <string name="launch_failed">无法打开</string>
 
     <string name="accessibility_label">SlideX 快捷操作</string>
-    <string name="accessibility_description">用于执行快捷方式卡片里的锁屏、截屏、打开通知栏、最近任务、分屏等系统操作，并识别当前在前台的应用，以便在你选定的应用里隐藏触发条。不读取屏幕内容。</string>
+    <string name="accessibility_description">用于执行快捷方式卡片里的锁屏、截屏、打开通知栏、最近任务、分屏等系统操作；识别当前在前台的应用，以便按黑名单或白名单显示触发条；以及识别输入法窗口的位置，让悬浮图标避开键盘。只查看窗口的类型和位置，不读取屏幕上的文字和内容。</string>
 
     <string name="section_config">配置</string>
     <string name="config_export">导出配置</string>
