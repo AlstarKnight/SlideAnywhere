@@ -47,8 +47,13 @@ fun PanelConfig.setColumns(cardId: String, columns: Int): PanelConfig = mapCard(
     }
 }
 
-fun PanelConfig.addItem(cardId: String, item: Item): PanelConfig = mapCard(cardId) {
-    if (it is GridCard) it.copy(items = it.items + item) else it
+fun PanelConfig.addItems(cardId: String, items: List<Item>): PanelConfig = mapCard(cardId) {
+    if (it is GridCard) it.copy(items = it.items + items) else it
+}
+
+/** Moves the icon at [from] to [to] within a grid card. */
+fun PanelConfig.moveItem(cardId: String, from: Int, to: Int): PanelConfig = mapCard(cardId) {
+    if (it is GridCard) it.copy(items = it.items.move(from, to)) else it
 }
 
 fun PanelConfig.removeItem(cardId: String, index: Int): PanelConfig = mapCard(cardId) {

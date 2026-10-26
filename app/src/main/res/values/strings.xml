@@ -83,8 +83,8 @@
     <string name="default_card_switches">开关</string>
     <string name="new_grid_card_title">新卡片</string>
 
-    <string name="card_move_up">上移</string>
-    <string name="card_move_down">下移</string>
+    <string name="card_drag">按住拖动排序</string>
+    <string name="edit_drag_hint">长按图标可拖动换位置；按住卡片右上角的 ≡ 可拖动卡片</string>
     <string name="card_rename">重命名</string>
     <string name="card_delete">删除卡片</string>
     <string name="card_empty">还没有图标，进入编辑模式后点「添加」。</string>

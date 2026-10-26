@@ -8,6 +8,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +27,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -37,8 +40,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
@@ -58,24 +60,32 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -137,16 +147,53 @@ fun PanelContent(
                     Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.panel_open_settings))
                 }
             }
+            if (editing) {
+                Text(
+                    stringResource(R.string.edit_drag_hint),
+                    Modifier.padding(horizontal = 16.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { pageIndex ->
                 val page = config.pages.getOrNull(pageIndex) ?: return@HorizontalPager
+                val listState = rememberLazyListState()
+                val drag = remember(listState) { CardDrag(listState) }
+                val cardIds by rememberUpdatedState(page.cards.map { it.id })
+                val shownCards = if (drag.cardId == null) {
+                    page.cards
+                } else {
+                    drag.order.mapNotNull { id -> page.cards.firstOrNull { it.id == id } }
+                }
                 LazyColumn(
                     Modifier.fillMaxSize(),
+                    state = listState,
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(page.cards, key = { it.id }) { card ->
+                    items(shownCards, key = { it.id }) { card ->
                         PanelCard(
                             card = card,
+                            modifier = if (card.id == drag.cardId) {
+                                Modifier
+                                    .zIndex(1f)
+                                    .graphicsLayer { translationY = drag.offsetOf(card.id) }
+                            } else {
+                                Modifier.animateItem()
+                            },
+                            dragHandle = Modifier.pointerInput(card.id) {
+                                detectDragGestures(
+                                    onDragStart = { drag.start(card.id, cardIds) },
+                                    onDragEnd = {
+                                        drag.end()?.let { (id, offset) -> store.update { it.moveCard(id, offset) } }
+                                    },
+                                    onDragCancel = drag::cancel,
+                                    onDrag = { change, amount ->
+                                        change.consume()
+                                        drag.drag(amount.y)
+                                    },
+                                )
+                            },
                             editing = editing,
                             switches = switches,
                             onStartEditing = { editing = true },
@@ -161,7 +208,7 @@ fun PanelContent(
                             onClose = onClose,
                         )
                     }
-                    if (page.cards.isEmpty() && !editing) {
+                    if (shownCards.isEmpty() && !editing) {
                         item { EmptyPageHint() }
                     }
                     if (editing) {
@@ -219,7 +266,7 @@ fun PanelContent(
         addingToCard?.let { cardId ->
             AddItemSheet(
                 onAdd = { item ->
-                    store.update { it.addItem(cardId, item) }
+                    store.update { it.addItems(cardId, listOf(item)) }
                     addingToCard = null
                 },
                 onDismiss = { addingToCard = null },
@@ -241,6 +288,8 @@ private fun EmptyPageHint() {
 @Composable
 private fun PanelCard(
     card: Card,
+    modifier: Modifier,
+    dragHandle: Modifier,
     editing: Boolean,
     switches: Set<Action>,
     onStartEditing: () -> Unit,
@@ -249,9 +298,9 @@ private fun PanelCard(
     onAddItem: () -> Unit,
     onClose: () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth(), border = LocalThemeExtras.current.cardBorder) {
+    Card(modifier.fillMaxWidth(), border = LocalThemeExtras.current.cardBorder) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            CardHeader(card, editing, onStartEditing, store)
+            CardHeader(card, editing, dragHandle, onStartEditing, store)
             when (card) {
                 is GridCard -> {
                     if (editing) ColumnsStepper(card.columns) { n -> store.update { it.setColumns(card.id, n) } }
@@ -263,6 +312,7 @@ private fun PanelCard(
                         onLaunch = onLaunch,
                         onRemove = { index -> store.update { it.removeItem(card.id, index) } },
                         onAdd = onAddItem,
+                        onMove = { from, to -> store.update { it.moveItem(card.id, from, to) } },
                     )
                 }
                 is NoteCard -> NoteField(card, store)
@@ -402,7 +452,13 @@ private fun Stepper(text: String, value: Int, range: IntRange, step: Int = 1, on
 }
 
 @Composable
-private fun CardHeader(card: Card, editing: Boolean, onStartEditing: () -> Unit, store: ConfigStore) {
+private fun CardHeader(
+    card: Card,
+    editing: Boolean,
+    dragHandle: Modifier,
+    onStartEditing: () -> Unit,
+    store: ConfigStore,
+) {
     val context = LocalContext.current
     var renaming by remember(card.id) { mutableStateOf(false) }
     if (editing && renaming) {
@@ -436,13 +492,18 @@ private fun CardHeader(card: Card, editing: Boolean, onStartEditing: () -> Unit,
             style = MaterialTheme.typography.titleMedium,
         )
         if (editing) {
-            SmallIconButton(Icons.Default.KeyboardArrowUp, R.string.card_move_up) { store.update { it.moveCard(card.id, -1) } }
-            SmallIconButton(Icons.Default.KeyboardArrowDown, R.string.card_move_down) { store.update { it.moveCard(card.id, 1) } }
             SmallIconButton(Icons.Default.Edit, R.string.card_rename) { renaming = true }
             SmallIconButton(Icons.Default.Delete, R.string.card_delete) {
                 store.update { it.removeCard(card.id) }
                 if (card is WidgetCard) WidgetHost.deleteUnused(context, store.config.value)
             }
+            Icon(
+                Icons.Default.Menu,
+                contentDescription = stringResource(R.string.card_drag),
+                modifier = dragHandle
+                    .size(36.dp)
+                    .padding(8.dp),
+            )
         }
     }
 }
@@ -463,10 +524,19 @@ private fun ItemGrid(
     onLaunch: (Item) -> Unit,
     onRemove: (Int) -> Unit,
     onAdd: () -> Unit,
+    onMove: (from: Int, to: Int) -> Unit = { _, _ -> },
 ) {
+    // In edit mode an icon can be long-pressed and dragged: dragFrom is its index, dragOffset how far it has moved.
+    var dragFrom by remember { mutableStateOf<Int?>(null) }
+    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    var gridSize by remember { mutableStateOf(IntSize.Zero) }
+    val itemCount by rememberUpdatedState(items.size)
+    val move by rememberUpdatedState(onMove)
+    val haptics = LocalHapticFeedback.current
+
     // Cells are indexes into items; -1 is the "add" cell shown in edit mode.
-    val cells = items.indices.toList() + if (editing) listOf(-1) else emptyList()
-    if (cells.isEmpty()) {
+    val cellCount = items.size + if (editing) 1 else 0
+    if (cellCount == 0) {
         Text(
             stringResource(R.string.card_empty),
             Modifier.padding(bottom = 8.dp),
@@ -475,21 +545,67 @@ private fun ItemGrid(
         )
         return
     }
+    fun cellWidth() = gridSize.width.toFloat() / columns
+    fun cellHeight(): Float {
+        val rows = (itemCount + (if (editing) 1 else 0) + columns - 1) / columns
+        return gridSize.height.toFloat() / rows
+    }
+    fun cellAt(index: Int) = Offset(index % columns * cellWidth(), index / columns * cellHeight())
+    fun dropIndex(from: Int) =
+        gridDropIndex(from, dragOffset.x, dragOffset.y, cellWidth(), cellHeight(), columns, itemCount)
+
+    val from = dragFrom
+    val target = from?.let(::dropIndex)
+    val order = if (from != null && target != null) items.indices.toList().move(from, target) else items.indices.toList()
+    val cells = order + if (editing) listOf(-1) else emptyList()
     val iconSize = when {
         columns >= 6 -> 36.dp
         columns == 5 -> 40.dp
         else -> 44.dp
     }
-    Column {
-        cells.chunked(columns).forEach { row ->
-            Row {
-                row.forEach { index ->
+    val dragModifier = if (!editing) Modifier else Modifier.pointerInput(columns) {
+        detectDragGesturesAfterLongPress(
+            onDragStart = { position ->
+                val index = (position.y / cellHeight()).toInt() * columns + (position.x / cellWidth()).toInt()
+                if (index in 0 until itemCount) {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    dragFrom = index
+                    dragOffset = Offset.Zero
+                }
+            },
+            onDragEnd = {
+                dragFrom?.let { start ->
+                    val end = dropIndex(start)
+                    if (end != start) move(start, end)
+                }
+                dragFrom = null
+            },
+            onDragCancel = { dragFrom = null },
+            onDrag = { change, amount ->
+                if (dragFrom != null) {
+                    change.consume()
+                    dragOffset += amount
+                }
+            },
+        )
+    }
+    Column(
+        Modifier
+            .onSizeChanged { gridSize = it }
+            .then(dragModifier),
+    ) {
+        cells.chunked(columns).forEachIndexed { rowIndex, row ->
+            // The dragged icon's row is drawn last so the icon stays above the other rows.
+            val holdsDragged = from != null && from in row
+            Row(Modifier.zIndex(if (holdsDragged) 1f else 0f)) {
+                row.forEachIndexed { columnIndex, index ->
                     val cellModifier = Modifier.weight(1f)
                     if (index < 0) {
                         AddCell(iconSize, onAdd, cellModifier)
                     } else {
                         val item = items[index]
                         val action = (item as? ActionItem)?.action
+                        val dragged = index == from
                         ItemCell(
                             item = item,
                             iconSize = iconSize,
@@ -497,7 +613,18 @@ private fun ItemGrid(
                             editing = editing,
                             onClick = { onLaunch(item) },
                             onRemove = { onRemove(index) },
-                            modifier = cellModifier,
+                            modifier = if (!dragged) cellModifier else {
+                                // Drawn in the cell it would drop into, shifted back under the finger.
+                                val shift = cellAt(index) + dragOffset - cellAt(rowIndex * columns + columnIndex)
+                                cellModifier
+                                    .zIndex(1f)
+                                    .graphicsLayer {
+                                        translationX = shift.x
+                                        translationY = shift.y
+                                        scaleX = DRAG_SCALE
+                                        scaleY = DRAG_SCALE
+                                    }
+                            },
                         )
                     }
                 }
@@ -506,6 +633,8 @@ private fun ItemGrid(
         }
     }
 }
+
+private const val DRAG_SCALE = 1.1f
 
 @Composable
 private fun ItemCell(

@@ -64,13 +64,17 @@ class ConfigTest {
     }
 
     @Test
-    fun gridItemsCanBeAddedAndRemoved() {
+    fun gridItemsCanBeAddedMovedAndRemoved() {
         val link = LinkItem("百度", "https://www.baidu.com")
-        val withLink = config.addItem("g", link)
-        assertEquals(link, (withLink.pages[0].cards[0] as GridCard).items.last())
+        val screenshot = ActionItem("截屏", Action.SCREENSHOT)
+        val added = config.addItems("g", listOf(link, screenshot))
+        assertEquals(grid.items + link + screenshot, (added.pages[0].cards[0] as GridCard).items)
+        val moved = config.moveItem("g", 2, 0)
+        assertEquals(listOf(grid.items[2], grid.items[0], grid.items[1]), (moved.pages[0].cards[0] as GridCard).items)
+        assertEquals(config, config.moveItem("g", 0, 5))
         val removed = config.removeItem("g", 0)
         assertEquals(grid.items.drop(1), (removed.pages[0].cards[0] as GridCard).items)
-        assertEquals(config, config.addItem("n", link))
+        assertEquals(config, config.addItems("n", listOf(link)))
     }
 
     @Test
