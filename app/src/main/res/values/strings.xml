@@ -3,10 +3,27 @@
     <string name="app_name">SlideX</string>
 
     <string name="setting_enable">启用全局负一屏</string>
+    <string name="service_on">服务已开启</string>
+    <string name="service_off">服务已关闭</string>
+    <string name="needs_overlay">需要「悬浮窗」权限才能显示触发条和面板</string>
+    <string name="back">返回</string>
+
+    <string name="page_permissions">权限管理</string>
+    <string name="permissions_all_granted">全部已开启</string>
+    <string name="permissions_missing">%d 项未开启</string>
+    <string name="page_trigger">触发设置</string>
+    <string name="page_trigger_summary">触发方式、位置、区域、悬浮图标</string>
+    <string name="page_theme">主题外观</string>
+    <string name="page_theme_summary">主题、深浅色、图标包、面板宽度和模糊</string>
+    <string name="page_advanced">高级设置</string>
+    <string name="page_advanced_summary">黑名单/白名单、横屏隐藏、磁贴和桌面快捷方式、通知</string>
+    <string name="page_config">配置管理</string>
+    <string name="page_config_summary">导出、导入所有页面和卡片</string>
+    <string name="page_about">关于</string>
+    <string name="page_about_summary">版本、项目主页</string>
     <string name="setting_show_notification">显示常驻通知</string>
     <string name="show_notification_hint">关闭后通知栏不再显示 SlideX，但后台更容易被系统清理。</string>
 
-    <string name="section_permissions">权限</string>
     <string name="permission_overlay">悬浮窗</string>
     <string name="permission_overlay_desc">必需，用于在其他应用上层显示触发条和面板</string>
     <string name="permission_notifications">通知</string>
@@ -24,7 +41,15 @@
     <string name="permission_granted">已开启</string>
     <string name="permission_grant">去开启</string>
 
-    <string name="section_trigger">触发设置</string>
+    <string name="section_trigger_mode">触发</string>
+    <string name="section_position">位置</string>
+    <string name="section_area">区域</string>
+    <string name="section_ball_look">外观</string>
+    <string name="section_ball_actions">动作</string>
+    <string name="section_keyboard">输入法</string>
+    <string name="setting_avoid_keyboard">避让输入法</string>
+    <string name="avoid_keyboard_hint">键盘弹出时，悬浮图标挪到键盘上方，键盘收起后回到原位。</string>
+    <string name="needs_accessibility_hint">需要在「权限管理」里开启无障碍服务，用来识别当前应用和键盘位置。</string>
     <string name="setting_trigger_mode">触发方式</string>
     <string name="trigger_edge">边缘滑动</string>
     <string name="trigger_ball">悬浮图标</string>
@@ -46,13 +71,24 @@
     <string name="ball_hint">拖动图标可以放到屏幕任意位置，面板从离图标较近的一侧滑出。</string>
     <string name="handle_drag_hint">长按触发条约半秒，等它变亮后拖动，可以改变上下位置，拖过屏幕中线会换到另一侧。</string>
     <string name="ball_description">打开 SlideX 面板</string>
-    <string name="setting_hidden_apps">在这些应用中隐藏</string>
-    <string name="hidden_apps_none">未选择</string>
-    <string name="hidden_apps_count">已选 %d 个</string>
-    <string name="hidden_apps_hint">按应用隐藏需要开启无障碍服务，用来识别当前在前台的应用。</string>
+    <string name="section_app_list">黑名单 / 白名单</string>
+    <string name="setting_app_list_mode">模式</string>
+    <string name="app_list_blacklist">黑名单</string>
+    <string name="app_list_whitelist">白名单</string>
+    <string name="setting_blacklist">在这些应用中隐藏</string>
+    <string name="setting_whitelist">只在这些应用中显示</string>
+    <string name="listed_apps_none">未选择</string>
+    <string name="listed_apps_count">已选 %d 个</string>
+    <string name="blacklist_hint">进入选中的应用时，自动隐藏触发条或悬浮图标。</string>
+    <string name="whitelist_hint">只在选中的应用里显示触发条或悬浮图标（列表里也有桌面）。SlideX 自己的设置页总会显示，方便调整。</string>
     <string name="setting_hide_in_landscape">横屏时隐藏</string>
+    <string name="section_other_entries">其他打开方式</string>
+    <string name="tile_hint">下拉通知栏，进入快捷设置的编辑页，把「SlideX 面板」磁贴拖进去，就能从通知栏打开面板。</string>
+    <string name="shortcut_pin">添加桌面快捷方式</string>
+    <string name="shortcut_hint">也可以长按 SlideX 的桌面图标，选「打开面板」。</string>
+    <string name="section_notification">通知</string>
 
-    <string name="section_theme">主题外观</string>
+    <string name="section_theme">主题</string>
     <string name="theme_starry">星空</string>
     <string name="theme_material">Material</string>
     <string name="theme_paper">纸感</string>
@@ -68,6 +104,7 @@
     <string name="section_panel">面板</string>
     <string name="setting_panel_width">负一屏宽度</string>
     <string name="setting_panel_blur">背景模糊</string>
+    <string name="setting_brightness_see_through">调节亮度时面板变透明</string>
     <string name="panel_blur_hint">打开面板时把后面的界面模糊。部分手机在省电模式下或系统关闭了模糊效果时不生效。</string>
 
     <string name="panel_open_settings">设置</string>
@@ -206,7 +243,10 @@
     <string name="accessibility_label">SlideX 快捷操作</string>
     <string name="accessibility_description">用于执行快捷方式卡片里的锁屏、截屏、打开通知栏、最近任务、分屏等系统操作；识别当前在前台的应用，以便按黑名单或白名单显示触发条；以及识别输入法窗口的位置，让悬浮图标避开键盘。只查看窗口的类型和位置，不读取屏幕上的文字和内容。</string>
 
-    <string name="section_config">配置</string>
+    <string name="config_hint">配置包含所有页面和卡片，导出为 JSON 文件后，换机或重装时可以导入。设置项不在其中。</string>
+    <string name="about_version">%1$s %2$s</string>
+    <string name="about_project">项目主页</string>
+    <string name="about_credits">功能和交互参考已停更的「全局负一屏」，边缘触发参考 Smart Edge（MIT），图标来自 Material Symbols（Apache 2.0）。</string>
     <string name="config_export">导出配置</string>
     <string name="config_import">导入配置</string>
     <string name="config_exported">配置已导出</string>

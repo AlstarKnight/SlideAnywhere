@@ -19,11 +19,14 @@ data class AppEntry(val label: String, val packageName: String, val activityName
 object InstalledApps {
     private val icons = LruCache<String, ImageBitmap>(200)
 
-    /** Launcher activities of all installed apps, sorted by label. Call off the main thread. */
-    fun load(context: Context): List<AppEntry> {
+    /**
+     * Launcher activities of all installed apps (or, with [Intent.CATEGORY_HOME], the home screens), sorted by
+     * label. Call off the main thread.
+     */
+    fun load(context: Context, category: String = Intent.CATEGORY_LAUNCHER): List<AppEntry> {
         val pm = context.packageManager
         val collator = Collator.getInstance()
-        return pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+        return pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(category), 0)
             .map {
                 val label = it.loadLabel(pm).toString()
                 val packageName = it.activityInfo.packageName

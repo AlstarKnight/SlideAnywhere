@@ -3,6 +3,7 @@ package io.github.alstarknight.slidex
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.NotificationManager
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,14 +12,17 @@ import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,11 +36,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -48,14 +60,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -68,35 +85,439 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import kotlin.math.roundToInt
 
+/**
+ * The settings, laid out like the original app's: the service switch first, then one entry per topic, each
+ * opening its own page.
+ */
+private enum class SettingsPage(@StringRes val title: Int, @StringRes val summary: Int) {
+    PERMISSIONS(R.string.page_permissions, R.string.permissions_all_granted),
+    TRIGGER(R.string.page_trigger, R.string.page_trigger_summary),
+    THEME(R.string.page_theme, R.string.page_theme_summary),
+    ADVANCED(R.string.page_advanced, R.string.page_advanced_summary),
+    CONFIG(R.string.page_config, R.string.page_config_summary),
+    ABOUT(R.string.page_about, R.string.page_about_summary),
+}
+
+/** Which special permissions SlideX holds; read again whenever the settings come back into view. */
+private data class Permissions(
+    val overlay: Boolean,
+    val notifications: Boolean,
+    val accessibility: Boolean,
+    val writeSettings: Boolean,
+    val dnd: Boolean,
+    val usage: Boolean,
+    val battery: Boolean,
+) {
+    val missing: Int
+        get() = listOf(overlay, notifications, accessibility, writeSettings, dnd, usage, battery).count { !it }
+}
+
+private fun readPermissions(context: Context) = Permissions(
+    overlay = Settings.canDrawOverlays(context),
+    notifications = hasNotificationPermission(context),
+    accessibility = ActionAccessibilityService.isEnabled(context),
+    writeSettings = Settings.System.canWrite(context),
+    dnd = context.getSystemService(NotificationManager::class.java).isNotificationPolicyAccessGranted,
+    usage = UsageApps.hasAccess(context),
+    battery = context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName),
+)
+
 @Composable
 fun SettingsScreen(prefs: Prefs) {
     val context = LocalContext.current
-    var overlayGranted by remember { mutableStateOf(false) }
-    var notificationsGranted by remember { mutableStateOf(false) }
-    var batteryUnrestricted by remember { mutableStateOf(false) }
-    var accessibilityEnabled by remember { mutableStateOf(false) }
-    var writeSettingsGranted by remember { mutableStateOf(false) }
-    var dndAccessGranted by remember { mutableStateOf(false) }
-    var usageAccessGranted by remember { mutableStateOf(false) }
-    var serviceEnabled by remember { mutableStateOf(prefs.serviceEnabled) }
+    var permissions by remember { mutableStateOf(readPermissions(context)) }
+    var page by rememberSaveable { mutableStateOf<SettingsPage?>(null) }
 
     LifecycleResumeEffect(Unit) {
-        overlayGranted = Settings.canDrawOverlays(context)
-        notificationsGranted = hasNotificationPermission(context)
-        batteryUnrestricted = context.getSystemService(PowerManager::class.java)
-            .isIgnoringBatteryOptimizations(context.packageName)
-        accessibilityEnabled = ActionAccessibilityService.isEnabled(context)
-        writeSettingsGranted = Settings.System.canWrite(context)
-        dndAccessGranted = context.getSystemService(NotificationManager::class.java).isNotificationPolicyAccessGranted
-        usageAccessGranted = UsageApps.hasAccess(context)
+        permissions = readPermissions(context)
         // Covers returning from the overlay permission screen and the service having been killed.
-        if (prefs.serviceEnabled && overlayGranted) PanelService.start(context)
+        if (prefs.serviceEnabled && permissions.overlay) PanelService.start(context)
         onPauseOrDispose {}
     }
+    BackHandler(enabled = page != null) { page = null }
 
-    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        notificationsGranted = it
+    Surface(Modifier.fillMaxSize()) {
+        val current = page
+        if (current == null) {
+            SettingsHome(prefs, permissions, onOpen = { page = it })
+            return@Surface
+        }
+        // A fresh page each time, so it starts scrolled to the top.
+        key(current) {
+            SettingsSubpage(current, onBack = { page = null }) {
+                when (current) {
+                    SettingsPage.PERMISSIONS -> PermissionSettings(permissions) {
+                        permissions = readPermissions(context)
+                    }
+                    SettingsPage.TRIGGER -> TriggerSettings(prefs, permissions.accessibility)
+                    SettingsPage.THEME -> ThemeSettings(prefs)
+                    SettingsPage.ADVANCED -> AdvancedSettings(prefs, permissions.accessibility)
+                    SettingsPage.CONFIG -> ConfigSettings()
+                    SettingsPage.ABOUT -> AboutSettings()
+                }
+            }
+        }
     }
+}
+
+@Composable
+private fun SettingsHome(prefs: Prefs, permissions: Permissions, onOpen: (SettingsPage) -> Unit) {
+    val context = LocalContext.current
+    Column(
+        Modifier
+            .verticalScroll(rememberScrollState())
+            .safeDrawingPadding()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        val titleBrush = LocalThemeExtras.current.titleBrush
+        Text(
+            stringResource(R.string.app_name),
+            style = titleBrush?.let { MaterialTheme.typography.headlineMedium.copy(brush = it) }
+                ?: MaterialTheme.typography.headlineMedium,
+        )
+
+        Section {
+            var serviceEnabled by remember { mutableStateOf(prefs.serviceEnabled) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.setting_enable), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(if (serviceEnabled) R.string.service_on else R.string.service_off),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (serviceEnabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+                Switch(
+                    checked = serviceEnabled,
+                    onCheckedChange = { on ->
+                        serviceEnabled = on
+                        prefs.serviceEnabled = on
+                        when {
+                            !on -> PanelService.stop(context)
+                            permissions.overlay -> PanelService.start(context)
+                            else -> context.startActivity(overlaySettingsIntent(context))
+                        }
+                    },
+                )
+            }
+            if (!permissions.overlay) {
+                PermissionHint(R.string.needs_overlay) { context.startActivity(overlaySettingsIntent(context)) }
+            }
+        }
+
+        Card(Modifier.fillMaxWidth()) {
+            SettingsPage.entries.forEachIndexed { index, page ->
+                if (index > 0) HorizontalDivider(Modifier.padding(start = 56.dp))
+                val summary = if (page == SettingsPage.PERMISSIONS && permissions.missing > 0) {
+                    stringResource(R.string.permissions_missing, permissions.missing)
+                } else {
+                    stringResource(page.summary)
+                }
+                PageEntry(pageIcon(page), stringResource(page.title), summary) { onOpen(page) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun pageIcon(page: SettingsPage): Painter = when (page) {
+    SettingsPage.PERMISSIONS -> painterResource(R.drawable.ic_action_lock)
+    SettingsPage.TRIGGER -> painterResource(R.drawable.ic_action_tune)
+    SettingsPage.THEME -> painterResource(R.drawable.ic_action_visibility)
+    SettingsPage.ADVANCED -> painterResource(R.drawable.ic_action_settings)
+    SettingsPage.CONFIG -> rememberVectorPainter(Icons.Default.Share)
+    SettingsPage.ABOUT -> rememberVectorPainter(Icons.Default.Info)
+}
+
+/** An entry on the home page: icon, title, a line on what is inside, and an arrow. */
+@Composable
+private fun PageEntry(icon: Painter, title: String, summary: String, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Column(Modifier.weight(1f)) {
+            Text(title)
+            Text(
+                summary,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun SettingsSubpage(page: SettingsPage, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.safeDrawingPadding()) {
+        Row(Modifier.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+            }
+            Text(stringResource(page.title), style = MaterialTheme.typography.titleLarge)
+        }
+        Column(
+            Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun PermissionSettings(permissions: Permissions, onChanged: () -> Unit) {
+    val context = LocalContext.current
+    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        onChanged()
+    }
+    Section {
+        PermissionRow(
+            title = stringResource(R.string.permission_overlay),
+            description = stringResource(R.string.permission_overlay_desc),
+            granted = permissions.overlay,
+        ) { context.startActivity(overlaySettingsIntent(context)) }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            PermissionRow(
+                title = stringResource(R.string.permission_notifications),
+                description = stringResource(R.string.permission_notifications_desc),
+                granted = permissions.notifications,
+            ) { notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }
+        }
+        PermissionRow(
+            title = stringResource(R.string.permission_accessibility),
+            description = stringResource(R.string.permission_accessibility_desc),
+            granted = permissions.accessibility,
+        ) { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+        PermissionRow(
+            title = stringResource(R.string.permission_write_settings),
+            description = stringResource(R.string.permission_write_settings_desc),
+            granted = permissions.writeSettings,
+        ) { context.startActivity(ItemLauncher.writeSettingsIntent(context)) }
+        PermissionRow(
+            title = stringResource(R.string.permission_dnd),
+            description = stringResource(R.string.permission_dnd_desc),
+            granted = permissions.dnd,
+        ) { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) }
+        PermissionRow(
+            title = stringResource(R.string.permission_usage),
+            description = stringResource(R.string.permission_usage_desc),
+            granted = permissions.usage,
+        ) { context.startActivity(UsageApps.settingsIntent()) }
+        PermissionRow(
+            title = stringResource(R.string.permission_battery),
+            description = stringResource(R.string.permission_battery_desc),
+            granted = permissions.battery,
+        ) { context.startActivity(batteryOptimizationIntent(context)) }
+    }
+}
+
+@Composable
+private fun TriggerSettings(prefs: Prefs, accessibilityEnabled: Boolean) {
+    var mode by remember { mutableStateOf(prefs.triggerMode) }
+    SectionTitle(stringResource(R.string.section_trigger_mode))
+    Section {
+        ChoiceRow(
+            stringResource(R.string.setting_trigger_mode),
+            listOf(TriggerMode.EDGE to R.string.trigger_edge, TriggerMode.BALL to R.string.trigger_ball),
+            mode,
+        ) {
+            mode = it
+            prefs.triggerMode = it
+        }
+    }
+    if (mode == TriggerMode.EDGE) EdgeHandleSettings(prefs) else FloatingBallSettings(prefs, accessibilityEnabled)
+}
+
+@Composable
+private fun EdgeHandleSettings(prefs: Prefs) {
+    SectionTitle(stringResource(R.string.section_position))
+    Section {
+        var side by remember { mutableStateOf(prefs.side) }
+        ChoiceRow(
+            stringResource(R.string.setting_side),
+            listOf(Side.LEFT to R.string.side_left, Side.RIGHT to R.string.side_right),
+            side,
+        ) {
+            side = it
+            prefs.side = it
+        }
+        SliderRow(stringResource(R.string.setting_handle_position), "%", prefs.handlePositionPercent, 0..100) {
+            prefs.handlePositionPercent = it
+        }
+        Hint(stringResource(R.string.handle_drag_hint))
+    }
+    SectionTitle(stringResource(R.string.section_area))
+    Section {
+        // The system grants at most 200dp of back-gesture exclusion per edge.
+        SliderRow(stringResource(R.string.setting_handle_height), "dp", prefs.handleHeightDp, 60..200) {
+            prefs.handleHeightDp = it
+        }
+        SliderRow(stringResource(R.string.setting_handle_width), "dp", prefs.handleWidthDp, 8..40) {
+            prefs.handleWidthDp = it
+        }
+        var showHandle by remember { mutableStateOf(prefs.showHandle) }
+        SwitchRow(stringResource(R.string.setting_show_handle), showHandle) {
+            showHandle = it
+            prefs.showHandle = it
+        }
+    }
+}
+
+@Composable
+private fun FloatingBallSettings(prefs: Prefs, accessibilityEnabled: Boolean) {
+    SectionTitle(stringResource(R.string.section_ball_look))
+    Section {
+        var shape by remember { mutableStateOf(prefs.ballShape) }
+        ChoiceRow(
+            stringResource(R.string.setting_ball_shape),
+            listOf(BallShape.CIRCLE to R.string.ball_circle, BallShape.SQUARE to R.string.ball_square),
+            shape,
+        ) {
+            shape = it
+            prefs.ballShape = it
+        }
+        SliderRow(stringResource(R.string.setting_ball_size), "dp", prefs.ballSizeDp, 32..96) { prefs.ballSizeDp = it }
+        SliderRow(stringResource(R.string.setting_ball_opacity), "%", prefs.ballOpacityPercent, 30..100) {
+            prefs.ballOpacityPercent = it
+        }
+        Hint(stringResource(R.string.ball_hint))
+    }
+    SectionTitle(stringResource(R.string.section_ball_actions))
+    Section {
+        var tapAction by remember { mutableStateOf(prefs.ballTapAction) }
+        ActionChoice(stringResource(R.string.setting_ball_tap), tapAction) {
+            tapAction = it
+            prefs.ballTapAction = it
+        }
+        var longPressAction by remember { mutableStateOf(prefs.ballLongPressAction) }
+        ActionChoice(stringResource(R.string.setting_ball_long_press), longPressAction) {
+            longPressAction = it
+            prefs.ballLongPressAction = it
+        }
+    }
+    SectionTitle(stringResource(R.string.section_keyboard))
+    Section {
+        var avoidKeyboard by remember { mutableStateOf(prefs.avoidKeyboard) }
+        SwitchRow(stringResource(R.string.setting_avoid_keyboard), avoidKeyboard) {
+            avoidKeyboard = it
+            prefs.avoidKeyboard = it
+        }
+        Hint(stringResource(R.string.avoid_keyboard_hint))
+        if (!accessibilityEnabled) Hint(stringResource(R.string.needs_accessibility_hint))
+    }
+}
+
+@Composable
+private fun ThemeSettings(prefs: Prefs) {
+    SectionTitle(stringResource(R.string.section_theme))
+    Section {
+        var preset by remember { mutableStateOf(prefs.themePreset) }
+        ThemePicker(preset) {
+            preset = it
+            prefs.themePreset = it
+        }
+        var darkMode by remember { mutableStateOf(prefs.darkMode) }
+        ChoiceRow(
+            stringResource(R.string.setting_dark_mode),
+            listOf(
+                DarkMode.SYSTEM to R.string.dark_mode_system,
+                DarkMode.LIGHT to R.string.dark_mode_light,
+                DarkMode.DARK to R.string.dark_mode_dark,
+            ),
+            darkMode,
+        ) {
+            darkMode = it
+            prefs.darkMode = it
+        }
+        IconPackChoice(prefs)
+    }
+    SectionTitle(stringResource(R.string.section_panel))
+    Section {
+        SliderRow(stringResource(R.string.setting_panel_width), "%", prefs.panelWidthPercent, 50..100) {
+            prefs.panelWidthPercent = it
+        }
+        // Blurring what is behind a window needs Android 12.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            var blur by remember { mutableStateOf(prefs.panelBlur) }
+            SwitchRow(stringResource(R.string.setting_panel_blur), blur) {
+                blur = it
+                prefs.panelBlur = it
+            }
+            Hint(stringResource(R.string.panel_blur_hint))
+        }
+        var seeThrough by remember { mutableStateOf(prefs.brightnessSeeThrough) }
+        SwitchRow(stringResource(R.string.setting_brightness_see_through), seeThrough) {
+            seeThrough = it
+            prefs.brightnessSeeThrough = it
+        }
+    }
+}
+
+@Composable
+private fun AdvancedSettings(prefs: Prefs, accessibilityEnabled: Boolean) {
+    val context = LocalContext.current
+    SectionTitle(stringResource(R.string.section_app_list))
+    Section {
+        var mode by remember { mutableStateOf(prefs.appListMode) }
+        ChoiceRow(
+            stringResource(R.string.setting_app_list_mode),
+            listOf(
+                AppListMode.BLACKLIST to R.string.app_list_blacklist,
+                AppListMode.WHITELIST to R.string.app_list_whitelist,
+            ),
+            mode,
+        ) {
+            mode = it
+            prefs.appListMode = it
+        }
+        AppListRow(prefs, mode)
+        Hint(stringResource(if (mode == AppListMode.BLACKLIST) R.string.blacklist_hint else R.string.whitelist_hint))
+        if (!accessibilityEnabled) Hint(stringResource(R.string.needs_accessibility_hint))
+        var hideInLandscape by remember { mutableStateOf(prefs.hideInLandscape) }
+        SwitchRow(stringResource(R.string.setting_hide_in_landscape), hideInLandscape) {
+            hideInLandscape = it
+            prefs.hideInLandscape = it
+        }
+    }
+    SectionTitle(stringResource(R.string.section_other_entries))
+    Section {
+        Hint(stringResource(R.string.tile_hint))
+        OutlinedButton(onClick = { OpenPanelActivity.pinShortcut(context) }, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.shortcut_pin))
+        }
+        Hint(stringResource(R.string.shortcut_hint))
+    }
+    SectionTitle(stringResource(R.string.section_notification))
+    Section {
+        var showNotification by remember { mutableStateOf(prefs.showNotification) }
+        SwitchRow(stringResource(R.string.setting_show_notification), showNotification) {
+            showNotification = it
+            prefs.showNotification = it
+        }
+        Hint(stringResource(R.string.show_notification_hint))
+    }
+}
+
+@Composable
+private fun ConfigSettings() {
+    val context = LocalContext.current
     val store = remember { ConfigStore.get(context) }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) {
         if (it != null) toast(context, exportConfig(context, it, store.config.value))
@@ -105,7 +526,6 @@ fun SettingsScreen(prefs: Prefs) {
         if (it != null) toast(context, importConfig(context, it, store))
     }
     var confirmImport by remember { mutableStateOf(false) }
-
     if (confirmImport) {
         AlertDialog(
             onDismissRequest = { confirmImport = false },
@@ -121,208 +541,52 @@ fun SettingsScreen(prefs: Prefs) {
             },
         )
     }
-
-    Surface(Modifier.fillMaxSize()) {
-        Column(
-            Modifier
-                .verticalScroll(rememberScrollState())
-                .safeDrawingPadding()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            val titleBrush = LocalThemeExtras.current.titleBrush
-            Text(
-                stringResource(R.string.app_name),
-                style = titleBrush?.let { MaterialTheme.typography.headlineMedium.copy(brush = it) }
-                    ?: MaterialTheme.typography.headlineMedium,
-            )
-
-            Section {
-                SwitchRow(stringResource(R.string.setting_enable), serviceEnabled) { on ->
-                    serviceEnabled = on
-                    prefs.serviceEnabled = on
-                    when {
-                        !on -> PanelService.stop(context)
-                        overlayGranted -> PanelService.start(context)
-                        else -> context.startActivity(overlaySettingsIntent(context))
-                    }
-                }
-                var showNotification by remember { mutableStateOf(prefs.showNotification) }
-                SwitchRow(stringResource(R.string.setting_show_notification), showNotification) {
-                    showNotification = it
-                    prefs.showNotification = it
-                }
-                Hint(stringResource(R.string.show_notification_hint))
+    Section {
+        Hint(stringResource(R.string.config_hint))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { exportLauncher.launch("slidex-config.json") }, modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.config_export))
             }
-
-            SectionTitle(stringResource(R.string.section_permissions))
-            Section {
-                PermissionRow(
-                    title = stringResource(R.string.permission_overlay),
-                    description = stringResource(R.string.permission_overlay_desc),
-                    granted = overlayGranted,
-                ) { context.startActivity(overlaySettingsIntent(context)) }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    PermissionRow(
-                        title = stringResource(R.string.permission_notifications),
-                        description = stringResource(R.string.permission_notifications_desc),
-                        granted = notificationsGranted,
-                    ) { notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }
-                }
-                PermissionRow(
-                    title = stringResource(R.string.permission_accessibility),
-                    description = stringResource(R.string.permission_accessibility_desc),
-                    granted = accessibilityEnabled,
-                ) { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-                PermissionRow(
-                    title = stringResource(R.string.permission_write_settings),
-                    description = stringResource(R.string.permission_write_settings_desc),
-                    granted = writeSettingsGranted,
-                ) { context.startActivity(ItemLauncher.writeSettingsIntent(context)) }
-                PermissionRow(
-                    title = stringResource(R.string.permission_dnd),
-                    description = stringResource(R.string.permission_dnd_desc),
-                    granted = dndAccessGranted,
-                ) { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) }
-                PermissionRow(
-                    title = stringResource(R.string.permission_usage),
-                    description = stringResource(R.string.permission_usage_desc),
-                    granted = usageAccessGranted,
-                ) { context.startActivity(UsageApps.settingsIntent()) }
-                PermissionRow(
-                    title = stringResource(R.string.permission_battery),
-                    description = stringResource(R.string.permission_battery_desc),
-                    granted = batteryUnrestricted,
-                ) { context.startActivity(batteryOptimizationIntent(context)) }
-            }
-
-            SectionTitle(stringResource(R.string.section_trigger))
-            Section {
-                var mode by remember { mutableStateOf(prefs.triggerMode) }
-                ChoiceRow(
-                    stringResource(R.string.setting_trigger_mode),
-                    listOf(TriggerMode.EDGE to R.string.trigger_edge, TriggerMode.BALL to R.string.trigger_ball),
-                    mode,
-                ) {
-                    mode = it
-                    prefs.triggerMode = it
-                }
-                if (mode == TriggerMode.EDGE) EdgeHandleSettings(prefs) else FloatingBallSettings(prefs)
-                HiddenAppsRow(prefs)
-                if (!accessibilityEnabled) Hint(stringResource(R.string.hidden_apps_hint))
-                var hideInLandscape by remember { mutableStateOf(prefs.hideInLandscape) }
-                SwitchRow(stringResource(R.string.setting_hide_in_landscape), hideInLandscape) {
-                    hideInLandscape = it
-                    prefs.hideInLandscape = it
-                }
-            }
-
-            SectionTitle(stringResource(R.string.section_theme))
-            Section {
-                var preset by remember { mutableStateOf(prefs.themePreset) }
-                ThemePicker(preset) {
-                    preset = it
-                    prefs.themePreset = it
-                }
-                var darkMode by remember { mutableStateOf(prefs.darkMode) }
-                ChoiceRow(
-                    stringResource(R.string.setting_dark_mode),
-                    listOf(
-                        DarkMode.SYSTEM to R.string.dark_mode_system,
-                        DarkMode.LIGHT to R.string.dark_mode_light,
-                        DarkMode.DARK to R.string.dark_mode_dark,
-                    ),
-                    darkMode,
-                ) {
-                    darkMode = it
-                    prefs.darkMode = it
-                }
-                IconPackChoice(prefs)
-            }
-
-            SectionTitle(stringResource(R.string.section_panel))
-            Section {
-                SliderRow(stringResource(R.string.setting_panel_width), "%", prefs.panelWidthPercent, 50..100) {
-                    prefs.panelWidthPercent = it
-                }
-                // Blurring what is behind a window needs Android 12.
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    var blur by remember { mutableStateOf(prefs.panelBlur) }
-                    SwitchRow(stringResource(R.string.setting_panel_blur), blur) {
-                        blur = it
-                        prefs.panelBlur = it
-                    }
-                    Hint(stringResource(R.string.panel_blur_hint))
-                }
-            }
-
-            SectionTitle(stringResource(R.string.section_config))
-            Section {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { exportLauncher.launch("slidex-config.json") }, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.config_export))
-                    }
-                    OutlinedButton(onClick = { confirmImport = true }, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.config_import))
-                    }
-                }
+            OutlinedButton(onClick = { confirmImport = true }, modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.config_import))
             }
         }
     }
 }
 
 @Composable
-private fun EdgeHandleSettings(prefs: Prefs) {
-    var side by remember { mutableStateOf(prefs.side) }
-    ChoiceRow(stringResource(R.string.setting_side), listOf(Side.LEFT to R.string.side_left, Side.RIGHT to R.string.side_right), side) {
-        side = it
-        prefs.side = it
+private fun AboutSettings() {
+    val context = LocalContext.current
+    val version = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        } catch (e: PackageManager.NameNotFoundException) {
+            null
+        }
     }
-    SliderRow(stringResource(R.string.setting_handle_position), "%", prefs.handlePositionPercent, 0..100) {
-        prefs.handlePositionPercent = it
+    Section {
+        Text(stringResource(R.string.about_version, stringResource(R.string.app_name), version.orEmpty()))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable {
+                    try {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, PROJECT_URL.toUri()))
+                    } catch (e: ActivityNotFoundException) {
+                        toast(context, R.string.launch_failed)
+                    }
+                }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.about_project), Modifier.weight(1f))
+            Text(PROJECT_URL.removePrefix("https://"), color = MaterialTheme.colorScheme.primary)
+        }
+        Hint(stringResource(R.string.about_credits))
     }
-    // The system grants at most 200dp of back-gesture exclusion per edge.
-    SliderRow(stringResource(R.string.setting_handle_height), "dp", prefs.handleHeightDp, 60..200) {
-        prefs.handleHeightDp = it
-    }
-    SliderRow(stringResource(R.string.setting_handle_width), "dp", prefs.handleWidthDp, 8..40) {
-        prefs.handleWidthDp = it
-    }
-    var showHandle by remember { mutableStateOf(prefs.showHandle) }
-    SwitchRow(stringResource(R.string.setting_show_handle), showHandle) {
-        showHandle = it
-        prefs.showHandle = it
-    }
-    Hint(stringResource(R.string.handle_drag_hint))
 }
 
-@Composable
-private fun FloatingBallSettings(prefs: Prefs) {
-    var shape by remember { mutableStateOf(prefs.ballShape) }
-    ChoiceRow(
-        stringResource(R.string.setting_ball_shape),
-        listOf(BallShape.CIRCLE to R.string.ball_circle, BallShape.SQUARE to R.string.ball_square),
-        shape,
-    ) {
-        shape = it
-        prefs.ballShape = it
-    }
-    SliderRow(stringResource(R.string.setting_ball_size), "dp", prefs.ballSizeDp, 32..96) { prefs.ballSizeDp = it }
-    SliderRow(stringResource(R.string.setting_ball_opacity), "%", prefs.ballOpacityPercent, 30..100) {
-        prefs.ballOpacityPercent = it
-    }
-    var tapAction by remember { mutableStateOf(prefs.ballTapAction) }
-    ActionChoice(stringResource(R.string.setting_ball_tap), tapAction) {
-        tapAction = it
-        prefs.ballTapAction = it
-    }
-    var longPressAction by remember { mutableStateOf(prefs.ballLongPressAction) }
-    ActionChoice(stringResource(R.string.setting_ball_long_press), longPressAction) {
-        longPressAction = it
-        prefs.ballLongPressAction = it
-    }
-    Hint(stringResource(R.string.ball_hint))
-}
+private const val PROJECT_URL = "https://github.com/AlstarKnight/SlideX"
 
 /** A row showing what a gesture does; tapping it lists "open the panel" and every action to pick from. */
 @Composable
@@ -425,11 +689,14 @@ private fun IconPackChoice(prefs: Prefs) {
     )
 }
 
-/** A row showing how many apps hide the trigger; tapping it opens the app list. */
+/** A row showing how many apps are on the blacklist or whitelist; tapping it opens the app list. */
 @Composable
-private fun HiddenAppsRow(prefs: Prefs) {
-    var hiddenApps by remember { mutableStateOf(prefs.listedApps) }
+private fun AppListRow(prefs: Prefs, mode: AppListMode) {
+    var apps by remember { mutableStateOf(prefs.listedApps) }
     var picking by remember { mutableStateOf(false) }
+    val title = stringResource(
+        if (mode == AppListMode.BLACKLIST) R.string.setting_blacklist else R.string.setting_whitelist,
+    )
     Row(
         Modifier
             .fillMaxWidth()
@@ -437,21 +704,22 @@ private fun HiddenAppsRow(prefs: Prefs) {
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(stringResource(R.string.setting_hidden_apps), Modifier.weight(1f))
+        Text(title, Modifier.weight(1f))
         Text(
-            if (hiddenApps.isEmpty()) {
-                stringResource(R.string.hidden_apps_none)
+            if (apps.isEmpty()) {
+                stringResource(R.string.listed_apps_none)
             } else {
-                stringResource(R.string.hidden_apps_count, hiddenApps.size)
+                stringResource(R.string.listed_apps_count, apps.size)
             },
             color = MaterialTheme.colorScheme.primary,
         )
     }
     if (picking) {
-        HiddenAppsDialog(
-            selected = hiddenApps,
+        AppListDialog(
+            title = title,
+            selected = apps,
             onDone = {
-                hiddenApps = it
+                apps = it
                 prefs.listedApps = it
                 picking = false
             },
@@ -461,12 +729,14 @@ private fun HiddenAppsRow(prefs: Prefs) {
 }
 
 @Composable
-private fun HiddenAppsDialog(selected: Set<String>, onDone: (Set<String>) -> Unit, onDismiss: () -> Unit) {
+private fun AppListDialog(title: String, selected: Set<String>, onDone: (Set<String>) -> Unit, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val apps by produceState<List<AppEntry>?>(null) {
         value = withContext(Dispatchers.IO) {
+            // Home screens are listed too, so the trigger can be kept off (or only on) the home screen.
+            val all = InstalledApps.load(context) + InstalledApps.load(context, Intent.CATEGORY_HOME)
             // Apps already chosen come first, so they are easy to find and untick.
-            InstalledApps.load(context).distinctBy { it.packageName }.sortedBy { it.packageName !in selected }
+            all.distinctBy { it.packageName }.sortedBy { it.packageName !in selected }
         }
     }
     var checked by remember { mutableStateOf(selected) }
@@ -475,7 +745,7 @@ private fun HiddenAppsDialog(selected: Set<String>, onDone: (Set<String>) -> Uni
         Surface(Modifier.fillMaxHeight(0.85f), shape = MaterialTheme.shapes.extraLarge) {
             Column(Modifier.padding(vertical = 16.dp)) {
                 Text(
-                    stringResource(R.string.setting_hidden_apps),
+                    title,
                     Modifier.padding(horizontal = 24.dp),
                     style = MaterialTheme.typography.titleLarge,
                 )
