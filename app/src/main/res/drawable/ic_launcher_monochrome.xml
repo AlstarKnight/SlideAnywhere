@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Silhouette of the launcher icon for themed (monochrome) icons. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Back panels on either side -->
+    <path
+        android:fillAlpha="0.6"
+        android:fillColor="#FFFFFF"
+        android:pathData="M31.95,34.19L40.85,37.47L40.85,64.34L31.95,61.07Z" />
+    <path
+        android:fillAlpha="0.6"
+        android:fillColor="#FFFFFF"
+        android:pathData="M69.39,41.26L79.44,44.99L79.44,68.82L69.39,65.08Z" />
+    <!-- Front panel with its window -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M40.85,26.5L69.39,36.95L69.39,79.32L40.85,68.82Z M49.87,40.39L59.23,43.95L59.23,61.06L49.87,57.51Z" />
+</vector>
