@@ -42,6 +42,15 @@ class Prefs(context: Context) {
         get() = prefs.getInt(KEY_PANEL_WIDTH, 85)
         set(value) = prefs.edit { putInt(KEY_PANEL_WIDTH, value) }
 
+    /** Packages in which the trigger is hidden; telling which app is in front needs the accessibility service. */
+    var hiddenApps: Set<String>
+        get() = prefs.getStringSet(KEY_HIDDEN_APPS, null).orEmpty().toSet()
+        set(value) = prefs.edit { putStringSet(KEY_HIDDEN_APPS, value) }
+
+    var hideInLandscape: Boolean
+        get() = prefs.getBoolean(KEY_HIDE_IN_LANDSCAPE, false)
+        set(value) = prefs.edit { putBoolean(KEY_HIDE_IN_LANDSCAPE, value) }
+
     /** Blur what is behind the panel (Android 12+). */
     var panelBlur: Boolean
         get() = prefs.getBoolean(KEY_PANEL_BLUR, false)
@@ -119,6 +128,8 @@ class Prefs(context: Context) {
         const val KEY_SHOW_HANDLE = "show_handle"
         const val KEY_PANEL_WIDTH = "panel_width"
         const val KEY_PANEL_BLUR = "panel_blur"
+        const val KEY_HIDDEN_APPS = "hidden_apps"
+        const val KEY_HIDE_IN_LANDSCAPE = "hide_in_landscape"
         const val KEY_TRIGGER_MODE = "trigger_mode"
         const val KEY_BALL_SHAPE = "ball_shape"
         const val KEY_BALL_SIZE = "ball_size"

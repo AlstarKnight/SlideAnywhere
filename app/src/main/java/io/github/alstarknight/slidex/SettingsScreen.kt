@@ -20,20 +20,26 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -43,6 +49,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -52,9 +59,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import kotlin.math.roundToInt
 
@@ -198,6 +208,13 @@ fun SettingsScreen(prefs: Prefs) {
                     prefs.triggerMode = it
                 }
                 if (mode == TriggerMode.EDGE) EdgeHandleSettings(prefs) else FloatingBallSettings(prefs)
+                HiddenAppsRow(prefs)
+                if (!accessibilityEnabled) Hint(stringResource(R.string.hidden_apps_hint))
+                var hideInLandscape by remember { mutableStateOf(prefs.hideInLandscape) }
+                SwitchRow(stringResource(R.string.setting_hide_in_landscape), hideInLandscape) {
+                    hideInLandscape = it
+                    prefs.hideInLandscape = it
+                }
             }
 
             SectionTitle(stringResource(R.string.section_theme))
@@ -349,6 +366,104 @@ private fun ActionChoice(title: String, selected: Action?, onSelect: (Action?) -
             TextButton(onClick = { picking = false }) { Text(stringResource(R.string.cancel)) }
         },
     )
+}
+
+/** A row showing how many apps hide the trigger; tapping it opens the app list. */
+@Composable
+private fun HiddenAppsRow(prefs: Prefs) {
+    var hiddenApps by remember { mutableStateOf(prefs.hiddenApps) }
+    var picking by remember { mutableStateOf(false) }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable { picking = true }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(stringResource(R.string.setting_hidden_apps), Modifier.weight(1f))
+        Text(
+            if (hiddenApps.isEmpty()) {
+                stringResource(R.string.hidden_apps_none)
+            } else {
+                stringResource(R.string.hidden_apps_count, hiddenApps.size)
+            },
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+    if (picking) {
+        HiddenAppsDialog(
+            selected = hiddenApps,
+            onDone = {
+                hiddenApps = it
+                prefs.hiddenApps = it
+                picking = false
+            },
+            onDismiss = { picking = false },
+        )
+    }
+}
+
+@Composable
+private fun HiddenAppsDialog(selected: Set<String>, onDone: (Set<String>) -> Unit, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val apps by produceState<List<AppEntry>?>(null) {
+        value = withContext(Dispatchers.IO) {
+            // Apps already chosen come first, so they are easy to find and untick.
+            InstalledApps.load(context).distinctBy { it.packageName }.sortedBy { it.packageName !in selected }
+        }
+    }
+    var checked by remember { mutableStateOf(selected) }
+    var query by remember { mutableStateOf("") }
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(Modifier.fillMaxHeight(0.85f), shape = MaterialTheme.shapes.extraLarge) {
+            Column(Modifier.padding(vertical = 16.dp)) {
+                Text(
+                    stringResource(R.string.setting_hidden_apps),
+                    Modifier.padding(horizontal = 24.dp),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    singleLine = true,
+                    placeholder = { Text(stringResource(R.string.search_apps)) },
+                )
+                val list = apps
+                if (list == null) {
+                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    val filtered = list.filter { query.isBlank() || it.label.contains(query.trim(), ignoreCase = true) }
+                    LazyColumn(Modifier.weight(1f)) {
+                        items(filtered, key = { it.packageName }) { app ->
+                            val on = app.packageName in checked
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable { checked = if (on) checked - app.packageName else checked + app.packageName }
+                                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Checkbox(checked = on, onCheckedChange = null)
+                                Box(Modifier.padding(horizontal = 12.dp)) {
+                                    ItemIcon(AppItem(app.label, app.packageName, app.activityName), 32.dp)
+                                }
+                                Text(app.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
+                Row(Modifier.align(Alignment.End).padding(horizontal = 16.dp)) {
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+                    TextButton(onClick = { onDone(checked) }) { Text(stringResource(R.string.done)) }
+                }
+            }
+        }
+    }
 }
 
 @Composable
