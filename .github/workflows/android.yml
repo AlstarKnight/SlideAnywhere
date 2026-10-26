@@ -2,13 +2,15 @@ name: Android CI
 
 on:
   push:
-    branches: [main, "claude/**"]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      HAS_SIGNING_KEY: ${{ secrets.SIGNING_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -33,3 +35,19 @@ jobs:
         with:
           name: slideanywhere-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+
+      - name: Signed release APK
+        if: env.HAS_SIGNING_KEY == 'true'
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+        run: |
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          SIGNING_STORE_FILE="$RUNNER_TEMP/release.jks" ./gradlew --no-daemon assembleRelease
+
+      - uses: actions/upload-artifact@v4
+        if: env.HAS_SIGNING_KEY == 'true'
+        with:
+          name: slideanywhere-release-apk
+          path: app/build/outputs/apk/release/*.apk

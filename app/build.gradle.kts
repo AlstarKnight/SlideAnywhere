@@ -4,6 +4,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Release signing comes from CI secrets (see .github/workflows/android.yml); without them
+// only the debug build is installable.
+val signingStoreFile: String? = System.getenv("SIGNING_STORE_FILE")
+
 android {
     namespace = "io.github.alstarknight.slideanywhere"
     compileSdk = 36
@@ -16,8 +20,20 @@ android {
         versionName = "0.1.0"
     }
 
+    signingConfigs {
+        signingStoreFile?.let { path ->
+            create("release") {
+                storeFile = file(path)
+                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SIGNING_STORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
