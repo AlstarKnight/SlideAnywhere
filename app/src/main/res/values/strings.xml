@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">SlideAnywhere</string>
+    <string name="app_name">SlideX</string>
 
     <string name="setting_enable">启用全局负一屏</string>
 
@@ -78,12 +78,12 @@
     <string name="action_volume_down">音量减</string>
     <string name="action_flashlight">手电筒</string>
     <string name="action_voice_assistant">语音助手</string>
-    <string name="action_needs_accessibility">请先开启 SlideAnywhere 的无障碍服务</string>
+    <string name="action_needs_accessibility">请先开启 SlideX 的无障碍服务</string>
     <string name="action_needs_android_9">仅支持 Android 9 及以上的系统</string>
     <string name="action_failed">操作失败</string>
     <string name="launch_failed">无法打开</string>
 
-    <string name="accessibility_label">SlideAnywhere 快捷操作</string>
+    <string name="accessibility_label">SlideX 快捷操作</string>
     <string name="accessibility_description">用于执行快捷方式卡片里的锁屏、截屏、打开通知栏、最近任务、分屏等系统操作。不读取屏幕内容。</string>
 
     <string name="section_config">配置</string>

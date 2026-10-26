@@ -1,6 +1,6 @@
-# SlideAnywhere
+# SlideX
 
-全局负一屏：在任意界面从屏幕边缘滑出的卡片面板。目标是复刻已停更的 Android 应用「全局负一屏」，并适配新版 Android（最低 Android 8.0，目标 Android 16）。
+全局负一屏（仓库名 SlideAnywhere）：在任意界面从屏幕边缘滑出的卡片面板。目标是复刻已停更的 Android 应用「全局负一屏」，并适配新版 Android（最低 Android 8.0，目标 Android 16）。
 
 ## 当前进度
 
