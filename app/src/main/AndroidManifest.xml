@@ -40,7 +40,19 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- Behind the quick settings tile and the home screen shortcut; shows nothing and leaves no task. -->
+        <activity
+            android:name=".OpenPanelActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Invisible" />
 
         <!-- Started from the panel; its own task, so closing it returns to the app that was in front. -->
         <activity
@@ -56,6 +68,17 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Keeps an edge trigger or floating icon overlay on screen so the user can open the side panel from any app" />
+        </service>
+
+        <service
+            android:name=".PanelTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_stat_panel"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
         </service>
 
         <service

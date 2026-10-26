@@ -218,4 +218,8 @@
     <string name="notification_channel">常驻服务</string>
     <string name="notification_title">全局负一屏运行中</string>
     <string name="notification_text">点击打开面板</string>
+    <string name="tile_label">SlideX 面板</string>
+    <string name="shortcut_open_panel">打开 SlideX 面板</string>
+    <string name="shortcut_open_panel_short">打开面板</string>
+    <string name="shortcut_unsupported">当前桌面不支持添加快捷方式</string>
 </resources>
