@@ -13,7 +13,6 @@ import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.os.Build
 import android.provider.Settings
-import android.util.DisplayMetrics
 import android.util.Log
 import android.view.Gravity
 import android.view.View
@@ -21,13 +20,14 @@ import android.view.WindowManager
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 
-/** Foreground service that keeps the edge handle on screen and opens the panel from it. */
+/** Foreground service that keeps the edge handle or the floating icon on screen and opens the panel from it. */
 class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListener {
 
     private lateinit var prefs: Prefs
     private lateinit var windowManager: WindowManager
     private lateinit var launcher: ItemLauncher
     private var handle: EdgeHandleView? = null
+    private var ball: FloatingBall? = null
     private var panel: PanelWindow? = null
 
     override fun onBind(intent: Intent?) = null
@@ -39,7 +39,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
         launcher = ItemLauncher(this)
         // Add the overlay before going foreground: Android 15 only lets an overlay app start a
         // foreground service from the background while one of its overlay windows is visible.
-        if (Settings.canDrawOverlays(this)) addHandle()
+        if (Settings.canDrawOverlays(this)) addTrigger()
         prefs.prefs.registerOnSharedPreferenceChangeListener(this)
     }
 
@@ -56,19 +56,18 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             stopSelf()
             return START_NOT_STICKY
         }
-        if (handle == null) {
+        if (handle == null && ball == null) {
             stopSelf()
             return START_NOT_STICKY
         }
-        if (intent?.action == ACTION_OPEN_PANEL) openPanel()
+        if (intent?.action == ACTION_OPEN_PANEL) openPanel(if (ball != null) prefs.ballSide else prefs.side)
         return START_STICKY
     }
 
     override fun onDestroy() {
         prefs.prefs.unregisterOnSharedPreferenceChangeListener(this)
         panel?.remove()
-        handle?.let { windowManager.removeView(it) }
-        handle = null
+        removeTrigger()
         launcher.release()
         super.onDestroy()
     }
@@ -76,14 +75,35 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         updateHandle()
+        ball?.update()
     }
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
-        updateHandle()
+        if ((prefs.triggerMode == TriggerMode.BALL) != (ball != null)) {
+            removeTrigger()
+            addTrigger()
+        } else {
+            updateHandle()
+            ball?.update()
+        }
+    }
+
+    private fun addTrigger() {
+        when (prefs.triggerMode) {
+            TriggerMode.EDGE -> addHandle()
+            TriggerMode.BALL -> ball = FloatingBall(this, windowManager, prefs, onOpen = ::openPanel).also { it.add() }
+        }
+    }
+
+    private fun removeTrigger() {
+        handle?.let { windowManager.removeView(it) }
+        handle = null
+        ball?.remove()
+        ball = null
     }
 
     private fun addHandle() {
-        val view = EdgeHandleView(this, onOpen = ::openPanel)
+        val view = EdgeHandleView(this, onOpen = { openPanel(prefs.side) })
         handle = view
         applyHandleStyle(view)
         windowManager.addView(view, handleLayoutParams())
@@ -112,28 +132,21 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or if (prefs.side == Side.LEFT) Gravity.LEFT else Gravity.RIGHT
-            y = handleTop(screenHeight(), height, prefs.handlePositionPercent)
+            y = handleTop(windowManager.screenSize().y, height, prefs.handlePositionPercent)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
         }
     }
 
-    private fun screenHeight(): Int =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            windowManager.currentWindowMetrics.bounds.height()
-        } else {
-            @Suppress("DEPRECATION")
-            DisplayMetrics().also { windowManager.defaultDisplay.getRealMetrics(it) }.heightPixels
-        }
-
-    private fun openPanel() {
-        if (panel != null || handle == null) return
+    private fun openPanel(side: Side) {
+        if (panel != null || (handle == null && ball == null)) return
         handle?.visibility = View.GONE
+        ball?.visible = false
         panel = PanelWindow(
             context = this,
             windowManager = windowManager,
-            side = prefs.side,
+            side = side,
             widthFraction = prefs.panelWidthPercent / 100f,
             store = ConfigStore.get(this),
             launcher = launcher,
@@ -143,6 +156,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             onClosed = {
                 panel = null
                 handle?.visibility = View.VISIBLE
+                ball?.visible = true
             },
         ).also { it.show() }
     }

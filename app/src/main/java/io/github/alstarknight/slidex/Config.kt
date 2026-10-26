@@ -20,11 +20,28 @@ sealed interface Card {
 /** A titled grid of icons (apps, links, shortcuts), like the original app's cards. */
 @Serializable
 @SerialName("grid")
-data class GridCard(override val id: String, override val title: String, val items: List<Item> = emptyList()) : Card
+data class GridCard(
+    override val id: String,
+    override val title: String,
+    val items: List<Item> = emptyList(),
+    /** Icons per row. */
+    val columns: Int = DEFAULT_COLUMNS,
+) : Card
+
+const val DEFAULT_COLUMNS = 4
+val COLUMN_RANGE = 2..6
 
 @Serializable
 @SerialName("note")
 data class NoteCard(override val id: String, override val title: String, val text: String = "") : Card
+
+/** Live system information or controls: battery, brightness, volume, memory and storage. */
+@Serializable
+@SerialName("system")
+data class SystemCard(override val id: String, override val title: String, val kind: SystemKind) : Card
+
+@Serializable
+enum class SystemKind { BATTERY, BRIGHTNESS, VOLUME, STORAGE }
 
 @Serializable
 sealed interface Item {
@@ -61,6 +78,25 @@ enum class Action {
     VOLUME_DOWN,
     FLASHLIGHT,
     VOICE_ASSISTANT,
+    WIFI,
+    BLUETOOTH,
+    MOBILE_DATA,
+    HOTSPOT,
+    LOCATION,
+    NFC,
+    AIRPLANE_MODE,
+    AUTO_ROTATE,
+    AUTO_BRIGHTNESS,
+    KEEP_SCREEN_ON,
+    EYE_CARE,
+    SILENT,
+    VIBRATE,
+    POWER_MENU,
+    APP_DRAWER,
+    CAMERA,
+    GALLERY,
+    DIALER,
+    SETTINGS,
 }
 
 private val json = Json {

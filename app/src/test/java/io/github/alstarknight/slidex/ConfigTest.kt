@@ -77,4 +77,27 @@ class ConfigTest {
     fun noteTextCanBeChanged() {
         assertEquals("bye", (config.setNoteText("n", "bye").pages[0].cards[1] as NoteCard).text)
     }
+
+    @Test
+    fun gridsSavedBeforeColumnsExistedGetFour() {
+        val text = """{"pages":[{"cards":[{"type":"grid","id":"g","title":"t"}]}]}"""
+        assertEquals(DEFAULT_COLUMNS, (parseConfig(text).pages[0].cards[0] as GridCard).columns)
+    }
+
+    @Test
+    fun columnsStayInRange() {
+        fun columnsAfter(n: Int) = (config.setColumns("g", n).pages[0].cards[0] as GridCard).columns
+        assertEquals(5, columnsAfter(5))
+        assertEquals(COLUMN_RANGE.last, columnsAfter(9))
+        assertEquals(COLUMN_RANGE.first, columnsAfter(0))
+        assertEquals(config, config.setColumns("n", 5))
+    }
+
+    @Test
+    fun systemCardsRoundTripAndRename() {
+        val battery = SystemCard("s", "电量", SystemKind.BATTERY)
+        val withSystem = config.addCard(1, battery)
+        assertEquals(withSystem, parseConfig(withSystem.toJson()))
+        assertEquals("电池", withSystem.renameCard("s", "电池").pages[1].cards[0].title)
+    }
 }

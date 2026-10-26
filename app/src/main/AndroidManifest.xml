@@ -8,6 +8,15 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Switch cards: show whether WiFi and mobile data are on. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Silent mode switch (Do Not Disturb access). -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <!-- Auto-rotate and auto-brightness switches, brightness slider; the user grants it on a system page. -->
+    <uses-permission
+        android:name="android.permission.WRITE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
     <!-- App cards list and open any installed app, like a launcher. -->
     <uses-permission
         android:name="android.permission.QUERY_ALL_PACKAGES"
@@ -35,7 +44,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Keeps an edge trigger overlay on screen so the user can open the side panel from any app" />
+                android:value="Keeps an edge trigger or floating icon overlay on screen so the user can open the side panel from any app" />
         </service>
 
         <service

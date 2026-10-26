@@ -73,14 +73,17 @@ class ConfigStore private constructor(context: Context) {
         fun newId(): String = UUID.randomUUID().toString()
 
         private fun defaultConfig(context: Context): PanelConfig {
-            val shortcuts = listOf(Action.NOTIFICATIONS, Action.QUICK_SETTINGS, Action.SCREENSHOT, Action.LOCK_SCREEN)
-                .map { ActionItem(context.getString(it.labelRes), it) }
+            fun actions(vararg actions: Action) = actions.map { ActionItem(context.getString(it.labelRes), it) }
+            val shortcuts = actions(Action.NOTIFICATIONS, Action.QUICK_SETTINGS, Action.SCREENSHOT, Action.LOCK_SCREEN)
+            val switches = actions(Action.WIFI, Action.BLUETOOTH, Action.FLASHLIGHT, Action.AUTO_ROTATE)
             return PanelConfig(
                 pages = listOf(
                     Page(
                         listOf(
                             GridCard(newId(), context.getString(R.string.default_card_apps)),
                             GridCard(newId(), context.getString(R.string.default_card_shortcuts), shortcuts),
+                            GridCard(newId(), context.getString(R.string.default_card_switches), switches),
+                            SystemCard(newId(), context.getString(R.string.system_battery), SystemKind.BATTERY),
                             NoteCard(newId(), context.getString(R.string.default_card_note)),
                         ),
                     ),

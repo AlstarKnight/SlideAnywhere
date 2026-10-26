@@ -26,21 +26,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
@@ -49,9 +41,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,11 +56,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -76,17 +72,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private const val COLUMNS = 4
-
 /** The panel itself: swipeable pages of cards, with an edit mode for changing them. */
 @Composable
 fun PanelContent(store: ConfigStore, launcher: ItemLauncher, onOpenSettings: () -> Unit, onClose: () -> Unit) {
     val config by store.config.collectAsState()
+    val switches by launcher.switches.collectAsState()
     var editing by remember { mutableStateOf(false) }
     var addingToCard by remember { mutableStateOf<String?>(null) }
+    var showingDrawer by remember { mutableStateOf(false) }
     val pagerState = rememberPagerState { config.pages.size }
     val scope = rememberCoroutineScope()
+    val extras = LocalThemeExtras.current
 
+    LaunchedEffect(Unit) { launcher.refreshSwitches() }
     BackHandler(enabled = editing) { editing = false }
 
     Box(Modifier.fillMaxSize()) {
@@ -95,8 +93,17 @@ fun PanelContent(store: ConfigStore, launcher: ItemLauncher, onOpenSettings: () 
                 .fillMaxSize()
                 .safeDrawingPadding(),
         ) {
-            Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
+            Row(
+                Modifier
+                    .drawBehind { if (extras.stars) drawStars() }
+                    .padding(start = 16.dp, end = 4.dp, top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.app_name),
+                    style = extras.titleBrush?.let { MaterialTheme.typography.titleLarge.copy(brush = it) }
+                        ?: MaterialTheme.typography.titleLarge,
+                )
                 Spacer(Modifier.weight(1f))
                 if (config.pages.size > 1) {
                     Text(
@@ -126,13 +133,17 @@ fun PanelContent(store: ConfigStore, launcher: ItemLauncher, onOpenSettings: () 
                         PanelCard(
                             card = card,
                             editing = editing,
+                            switches = switches,
                             onStartEditing = { editing = true },
                             onLaunch = { item ->
-                                launcher.launch(item)
-                                onClose()
+                                when {
+                                    item is ActionItem && item.action == Action.APP_DRAWER -> showingDrawer = true
+                                    !launcher.launch(item) -> onClose()
+                                }
                             },
                             store = store,
                             onAddItem = { addingToCard = card.id },
+                            onClose = onClose,
                         )
                     }
                     if (page.cards.isEmpty() && !editing) {
@@ -152,6 +163,9 @@ fun PanelContent(store: ConfigStore, launcher: ItemLauncher, onOpenSettings: () 
                                     val title = it
                                     store.update { c -> c.addCard(pageIndex, NoteCard(ConfigStore.newId(), title)) }
                                 },
+                                onAddSystem = { kind, title ->
+                                    store.update { c -> c.addCard(pageIndex, SystemCard(ConfigStore.newId(), title, kind)) }
+                                },
                                 onAddPage = {
                                     store.update { it.addPage() }
                                     scope.launch { pagerState.animateScrollToPage(config.pages.size) }
@@ -166,6 +180,15 @@ fun PanelContent(store: ConfigStore, launcher: ItemLauncher, onOpenSettings: () 
                     }
                 }
             }
+        }
+        if (showingDrawer) {
+            AppDrawer(
+                onLaunch = { app ->
+                    launcher.launch(app)
+                    onClose()
+                },
+                onDismiss = { showingDrawer = false },
+            )
         }
         addingToCard?.let { cardId ->
             AddItemSheet(
@@ -193,24 +216,50 @@ private fun EmptyPageHint() {
 private fun PanelCard(
     card: Card,
     editing: Boolean,
+    switches: Set<Action>,
     onStartEditing: () -> Unit,
     onLaunch: (Item) -> Unit,
     store: ConfigStore,
     onAddItem: () -> Unit,
+    onClose: () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), border = LocalThemeExtras.current.cardBorder) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             CardHeader(card, editing, onStartEditing, store)
             when (card) {
-                is GridCard -> ItemGrid(
-                    items = card.items,
-                    editing = editing,
-                    onLaunch = onLaunch,
-                    onRemove = { index -> store.update { it.removeItem(card.id, index) } },
-                    onAdd = onAddItem,
-                )
+                is GridCard -> {
+                    if (editing) ColumnsStepper(card.columns) { n -> store.update { it.setColumns(card.id, n) } }
+                    ItemGrid(
+                        items = card.items,
+                        columns = card.columns,
+                        editing = editing,
+                        switches = switches,
+                        onLaunch = onLaunch,
+                        onRemove = { index -> store.update { it.removeItem(card.id, index) } },
+                        onAdd = onAddItem,
+                    )
+                }
                 is NoteCard -> NoteField(card, store)
+                is SystemCard -> SystemCardContent(card.kind, onClose)
             }
+        }
+    }
+}
+
+@Composable
+private fun ColumnsStepper(columns: Int, onChange: (Int) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            stringResource(R.string.card_columns, columns),
+            Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(onClick = { onChange(columns - 1) }, enabled = columns > COLUMN_RANGE.first) {
+            Text(stringResource(R.string.card_columns_fewer))
+        }
+        TextButton(onClick = { onChange(columns + 1) }, enabled = columns < COLUMN_RANGE.last) {
+            Text(stringResource(R.string.card_columns_more))
         }
     }
 }
@@ -267,7 +316,9 @@ private fun SmallIconButton(icon: ImageVector, description: Int, onClick: () -> 
 @Composable
 private fun ItemGrid(
     items: List<Item>,
+    columns: Int,
     editing: Boolean,
+    switches: Set<Action>,
     onLaunch: (Item) -> Unit,
     onRemove: (Int) -> Unit,
     onAdd: () -> Unit,
@@ -283,25 +334,48 @@ private fun ItemGrid(
         )
         return
     }
+    val iconSize = when {
+        columns >= 6 -> 36.dp
+        columns == 5 -> 40.dp
+        else -> 44.dp
+    }
     Column {
-        cells.chunked(COLUMNS).forEach { row ->
+        cells.chunked(columns).forEach { row ->
             Row {
                 row.forEach { index ->
                     val cellModifier = Modifier.weight(1f)
                     if (index < 0) {
-                        AddCell(onAdd, cellModifier)
+                        AddCell(iconSize, onAdd, cellModifier)
                     } else {
-                        ItemCell(items[index], editing, { onLaunch(items[index]) }, { onRemove(index) }, cellModifier)
+                        val item = items[index]
+                        val action = (item as? ActionItem)?.action
+                        ItemCell(
+                            item = item,
+                            iconSize = iconSize,
+                            switchedOn = action?.takeIf { it in SWITCH_ACTIONS }?.let { it in switches },
+                            editing = editing,
+                            onClick = { onLaunch(item) },
+                            onRemove = { onRemove(index) },
+                            modifier = cellModifier,
+                        )
                     }
                 }
-                repeat(COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
+                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
 }
 
 @Composable
-private fun ItemCell(item: Item, editing: Boolean, onClick: () -> Unit, onRemove: () -> Unit, modifier: Modifier) {
+private fun ItemCell(
+    item: Item,
+    iconSize: Dp,
+    switchedOn: Boolean?,
+    editing: Boolean,
+    onClick: () -> Unit,
+    onRemove: () -> Unit,
+    modifier: Modifier,
+) {
     Column(
         modifier
             .clip(RoundedCornerShape(12.dp))
@@ -310,7 +384,7 @@ private fun ItemCell(item: Item, editing: Boolean, onClick: () -> Unit, onRemove
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box {
-            ItemIcon(item, 44.dp)
+            ItemIcon(item, iconSize, switchedOn)
             if (editing) {
                 Box(
                     Modifier
@@ -342,7 +416,7 @@ private fun ItemCell(item: Item, editing: Boolean, onClick: () -> Unit, onRemove
 }
 
 @Composable
-private fun AddCell(onClick: () -> Unit, modifier: Modifier) {
+private fun AddCell(iconSize: Dp, onClick: () -> Unit, modifier: Modifier) {
     Column(
         modifier
             .clip(RoundedCornerShape(12.dp))
@@ -352,7 +426,7 @@ private fun AddCell(onClick: () -> Unit, modifier: Modifier) {
     ) {
         Box(
             Modifier
-                .size(44.dp)
+                .size(iconSize)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
@@ -367,9 +441,12 @@ private fun AddCell(onClick: () -> Unit, modifier: Modifier) {
     }
 }
 
-/** App or link icon when one can be loaded, otherwise a round badge with a symbol or the label's first letter. */
+/**
+ * App or link icon when one can be loaded, otherwise a round badge with a symbol or the label's first letter.
+ * [switchedOn] colors a switch's badge by its state; null shows the plain badge.
+ */
 @Composable
-fun ItemIcon(item: Item, size: Dp) {
+fun ItemIcon(item: Item, size: Dp, switchedOn: Boolean? = null) {
     val context = LocalContext.current
     val sizePx = with(LocalDensity.current) { size.roundToPx() }
     val key = InstalledApps.iconKey(item)
@@ -388,48 +465,32 @@ fun ItemIcon(item: Item, size: Dp) {
     if (loaded != null) {
         Image(loaded, contentDescription = null, modifier = Modifier.size(size))
     } else {
-        BadgeIcon(item, size)
+        BadgeIcon(item, size, switchedOn)
     }
 }
 
 @Composable
-private fun BadgeIcon(item: Item, size: Dp) {
-    val vector = (item as? ActionItem)?.action?.icon
+private fun BadgeIcon(item: Item, size: Dp, switchedOn: Boolean?) {
+    val colors = MaterialTheme.colorScheme
+    val (background, content) = when (switchedOn) {
+        null -> colors.primaryContainer to colors.onPrimaryContainer
+        true -> colors.primary to colors.onPrimary
+        false -> colors.surfaceVariant to colors.onSurfaceVariant
+    }
     Box(
         Modifier
             .size(size)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer),
+            .background(background),
         contentAlignment = Alignment.Center,
     ) {
-        if (vector != null) {
-            Icon(vector, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+        if (item is ActionItem) {
+            Icon(painterResource(item.action.iconRes), contentDescription = null, tint = content)
         } else {
-            Text(
-                item.label.take(1),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
+            Text(item.label.take(1), style = MaterialTheme.typography.titleMedium, color = content)
         }
     }
 }
-
-/** Material icon for actions that have a fitting one in the core icon set; the rest show their first letter. */
-private val Action.icon: ImageVector?
-    get() = when (this) {
-        Action.NOTIFICATIONS -> Icons.Default.Notifications
-        Action.QUICK_SETTINGS -> Icons.Default.Settings
-        Action.RECENTS -> Icons.Default.Menu
-        Action.HOME -> Icons.Default.Home
-        Action.BACK -> Icons.AutoMirrored.Filled.ArrowBack
-        Action.LOCK_SCREEN -> Icons.Default.Lock
-        Action.PLAY_PAUSE -> Icons.Default.PlayArrow
-        Action.NEXT_TRACK -> Icons.AutoMirrored.Filled.KeyboardArrowRight
-        Action.PREVIOUS_TRACK -> Icons.AutoMirrored.Filled.KeyboardArrowLeft
-        Action.VOLUME_UP -> Icons.Default.KeyboardArrowUp
-        Action.VOLUME_DOWN -> Icons.Default.KeyboardArrowDown
-        Action.SCREENSHOT, Action.SPLIT_SCREEN, Action.FLASHLIGHT, Action.VOICE_ASSISTANT -> null
-    }
 
 @Composable
 private fun NoteField(card: NoteCard, store: ConfigStore) {
@@ -458,17 +519,25 @@ private fun PageEditor(
     canMoveRight: Boolean,
     onAddGrid: (String) -> Unit,
     onAddNote: (String) -> Unit,
+    onAddSystem: (SystemKind, String) -> Unit,
     onAddPage: () -> Unit,
     onDeletePage: () -> Unit,
     onMovePage: (Int) -> Unit,
 ) {
     val gridTitle = stringResource(R.string.new_grid_card_title)
     val noteTitle = stringResource(R.string.default_card_note)
+    val systemTitles = SystemKind.entries.associateWith { stringResource(it.labelRes) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ButtonRow(
             R.string.page_add_grid_card to { onAddGrid(gridTitle) },
             R.string.page_add_note_card to { onAddNote(noteTitle) },
         )
+        SystemKind.entries.chunked(2).forEach { (first, second) ->
+            ButtonRow(
+                first.addLabelRes to { onAddSystem(first, systemTitles.getValue(first)) },
+                second.addLabelRes to { onAddSystem(second, systemTitles.getValue(second)) },
+            )
+        }
         ButtonRow(
             R.string.page_add to onAddPage,
             R.string.page_delete to onDeletePage.takeIf { canDelete },
@@ -479,6 +548,14 @@ private fun PageEditor(
         )
     }
 }
+
+private val SystemKind.addLabelRes: Int
+    get() = when (this) {
+        SystemKind.BATTERY -> R.string.page_add_battery_card
+        SystemKind.BRIGHTNESS -> R.string.page_add_brightness_card
+        SystemKind.VOLUME -> R.string.page_add_volume_card
+        SystemKind.STORAGE -> R.string.page_add_storage_card
+    }
 
 /** Two equal-width buttons; a null action shows the button disabled. */
 @Composable

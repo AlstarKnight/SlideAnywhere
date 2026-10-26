@@ -2,6 +2,7 @@ package io.github.alstarknight.slidex
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -12,14 +13,21 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -38,8 +46,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
@@ -54,6 +64,8 @@ fun SettingsScreen(prefs: Prefs) {
     var notificationsGranted by remember { mutableStateOf(false) }
     var batteryUnrestricted by remember { mutableStateOf(false) }
     var accessibilityEnabled by remember { mutableStateOf(false) }
+    var writeSettingsGranted by remember { mutableStateOf(false) }
+    var dndAccessGranted by remember { mutableStateOf(false) }
     var serviceEnabled by remember { mutableStateOf(prefs.serviceEnabled) }
 
     LifecycleResumeEffect(Unit) {
@@ -62,6 +74,8 @@ fun SettingsScreen(prefs: Prefs) {
         batteryUnrestricted = context.getSystemService(PowerManager::class.java)
             .isIgnoringBatteryOptimizations(context.packageName)
         accessibilityEnabled = ActionAccessibilityService.isEnabled(context)
+        writeSettingsGranted = Settings.System.canWrite(context)
+        dndAccessGranted = context.getSystemService(NotificationManager::class.java).isNotificationPolicyAccessGranted
         // Covers returning from the overlay permission screen and the service having been killed.
         if (prefs.serviceEnabled && overlayGranted) PanelService.start(context)
         onPauseOrDispose {}
@@ -103,7 +117,12 @@ fun SettingsScreen(prefs: Prefs) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
+            val titleBrush = LocalThemeExtras.current.titleBrush
+            Text(
+                stringResource(R.string.app_name),
+                style = titleBrush?.let { MaterialTheme.typography.headlineMedium.copy(brush = it) }
+                    ?: MaterialTheme.typography.headlineMedium,
+            )
 
             Section {
                 SwitchRow(stringResource(R.string.setting_enable), serviceEnabled) { on ->
@@ -137,6 +156,16 @@ fun SettingsScreen(prefs: Prefs) {
                     granted = accessibilityEnabled,
                 ) { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
                 PermissionRow(
+                    title = stringResource(R.string.permission_write_settings),
+                    description = stringResource(R.string.permission_write_settings_desc),
+                    granted = writeSettingsGranted,
+                ) { context.startActivity(ItemLauncher.writeSettingsIntent(context)) }
+                PermissionRow(
+                    title = stringResource(R.string.permission_dnd),
+                    description = stringResource(R.string.permission_dnd_desc),
+                    granted = dndAccessGranted,
+                ) { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) }
+                PermissionRow(
                     title = stringResource(R.string.permission_battery),
                     description = stringResource(R.string.permission_battery_desc),
                     granted = batteryUnrestricted,
@@ -145,34 +174,37 @@ fun SettingsScreen(prefs: Prefs) {
 
             SectionTitle(stringResource(R.string.section_trigger))
             Section {
-                var side by remember { mutableStateOf(prefs.side) }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.setting_side), Modifier.weight(1f))
-                    FilterChip(
-                        selected = side == Side.LEFT,
-                        onClick = { side = Side.LEFT; prefs.side = Side.LEFT },
-                        label = { Text(stringResource(R.string.side_left)) },
-                    )
-                    FilterChip(
-                        selected = side == Side.RIGHT,
-                        onClick = { side = Side.RIGHT; prefs.side = Side.RIGHT },
-                        label = { Text(stringResource(R.string.side_right)) },
-                    )
+                var mode by remember { mutableStateOf(prefs.triggerMode) }
+                ChoiceRow(
+                    stringResource(R.string.setting_trigger_mode),
+                    listOf(TriggerMode.EDGE to R.string.trigger_edge, TriggerMode.BALL to R.string.trigger_ball),
+                    mode,
+                ) {
+                    mode = it
+                    prefs.triggerMode = it
                 }
-                SliderRow(stringResource(R.string.setting_handle_position), "%", prefs.handlePositionPercent, 0..100) {
-                    prefs.handlePositionPercent = it
+                if (mode == TriggerMode.EDGE) EdgeHandleSettings(prefs) else FloatingBallSettings(prefs)
+            }
+
+            SectionTitle(stringResource(R.string.section_theme))
+            Section {
+                var preset by remember { mutableStateOf(prefs.themePreset) }
+                ThemePicker(preset) {
+                    preset = it
+                    prefs.themePreset = it
                 }
-                // The system grants at most 200dp of back-gesture exclusion per edge.
-                SliderRow(stringResource(R.string.setting_handle_height), "dp", prefs.handleHeightDp, 60..200) {
-                    prefs.handleHeightDp = it
-                }
-                SliderRow(stringResource(R.string.setting_handle_width), "dp", prefs.handleWidthDp, 8..40) {
-                    prefs.handleWidthDp = it
-                }
-                var showHandle by remember { mutableStateOf(prefs.showHandle) }
-                SwitchRow(stringResource(R.string.setting_show_handle), showHandle) {
-                    showHandle = it
-                    prefs.showHandle = it
+                var darkMode by remember { mutableStateOf(prefs.darkMode) }
+                ChoiceRow(
+                    stringResource(R.string.setting_dark_mode),
+                    listOf(
+                        DarkMode.SYSTEM to R.string.dark_mode_system,
+                        DarkMode.LIGHT to R.string.dark_mode_light,
+                        DarkMode.DARK to R.string.dark_mode_dark,
+                    ),
+                    darkMode,
+                ) {
+                    darkMode = it
+                    prefs.darkMode = it
                 }
             }
 
@@ -193,6 +225,106 @@ fun SettingsScreen(prefs: Prefs) {
                         Text(stringResource(R.string.config_import))
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EdgeHandleSettings(prefs: Prefs) {
+    var side by remember { mutableStateOf(prefs.side) }
+    ChoiceRow(stringResource(R.string.setting_side), listOf(Side.LEFT to R.string.side_left, Side.RIGHT to R.string.side_right), side) {
+        side = it
+        prefs.side = it
+    }
+    SliderRow(stringResource(R.string.setting_handle_position), "%", prefs.handlePositionPercent, 0..100) {
+        prefs.handlePositionPercent = it
+    }
+    // The system grants at most 200dp of back-gesture exclusion per edge.
+    SliderRow(stringResource(R.string.setting_handle_height), "dp", prefs.handleHeightDp, 60..200) {
+        prefs.handleHeightDp = it
+    }
+    SliderRow(stringResource(R.string.setting_handle_width), "dp", prefs.handleWidthDp, 8..40) {
+        prefs.handleWidthDp = it
+    }
+    var showHandle by remember { mutableStateOf(prefs.showHandle) }
+    SwitchRow(stringResource(R.string.setting_show_handle), showHandle) {
+        showHandle = it
+        prefs.showHandle = it
+    }
+}
+
+@Composable
+private fun FloatingBallSettings(prefs: Prefs) {
+    var shape by remember { mutableStateOf(prefs.ballShape) }
+    ChoiceRow(
+        stringResource(R.string.setting_ball_shape),
+        listOf(BallShape.CIRCLE to R.string.ball_circle, BallShape.SQUARE to R.string.ball_square),
+        shape,
+    ) {
+        shape = it
+        prefs.ballShape = it
+    }
+    SliderRow(stringResource(R.string.setting_ball_size), "dp", prefs.ballSizeDp, 32..96) { prefs.ballSizeDp = it }
+    SliderRow(stringResource(R.string.setting_ball_opacity), "%", prefs.ballOpacityPercent, 30..100) {
+        prefs.ballOpacityPercent = it
+    }
+    Text(
+        stringResource(R.string.ball_hint),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/** One tile per preset, showing a swatch of its accent. */
+@Composable
+private fun ThemePicker(selected: ThemePreset, onSelect: (ThemePreset) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ThemePreset.entries.forEach { preset ->
+            val shape = RoundedCornerShape(12.dp)
+            Column(
+                Modifier
+                    .weight(1f)
+                    .clip(shape)
+                    .border(
+                        if (preset == selected) 2.dp else 1.dp,
+                        if (preset == selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                        shape,
+                    )
+                    .clickable { onSelect(preset) }
+                    .padding(vertical = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Box(
+                    Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(presetSwatch(preset)),
+                )
+                Text(
+                    stringResource(preset.labelRes),
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/** A title with one chip per option below it. */
+@Composable
+private fun <T> ChoiceRow(title: String, options: List<Pair<T, Int>>, selected: T, onSelect: (T) -> Unit) {
+    Column {
+        Text(title)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            options.forEach { (value, label) ->
+                FilterChip(
+                    selected = value == selected,
+                    onClick = { onSelect(value) },
+                    label = { Text(stringResource(label)) },
+                )
             }
         }
     }
