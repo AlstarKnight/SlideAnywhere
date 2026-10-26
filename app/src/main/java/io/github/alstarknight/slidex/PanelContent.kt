@@ -265,8 +265,8 @@ fun PanelContent(
         }
         addingToCard?.let { cardId ->
             AddItemSheet(
-                onAdd = { item ->
-                    store.update { it.addItems(cardId, listOf(item)) }
+                onAdd = { items ->
+                    store.update { it.addItems(cardId, items) }
                     addingToCard = null
                 },
                 onDismiss = { addingToCard = null },

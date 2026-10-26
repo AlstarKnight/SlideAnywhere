@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -34,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -49,18 +51,30 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Full-panel sheet for picking what to add to a grid card: an app, a shortcut action or a link. */
+/**
+ * Full-panel sheet for picking what to add to a grid card: apps, shortcut actions, ready-made links and links of
+ * your own. Several can be ticked, across tabs, and added together.
+ */
 @Composable
-fun AddItemSheet(onAdd: (Item) -> Unit, onDismiss: () -> Unit) {
+fun AddItemSheet(onAdd: (List<Item>) -> Unit, onDismiss: () -> Unit) {
     BackHandler(onBack = onDismiss)
     var tab by remember { mutableIntStateOf(0) }
+    val selected = remember { mutableStateListOf<Item>() }
+    val toggle = { item: Item -> if (!selected.remove(item)) selected.add(item) }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceContainer) {
         Column(Modifier.safeDrawingPadding()) {
             Row(Modifier.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss) {
                     Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
                 }
-                Text(stringResource(R.string.item_add), style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.item_add), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                Button(
+                    onClick = { onAdd(selected.toList()) },
+                    enabled = selected.isNotEmpty(),
+                    modifier = Modifier.padding(end = 8.dp),
+                ) {
+                    Text(stringResource(R.string.add_selected, selected.size))
+                }
             }
             Row(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(R.string.add_tab_apps, R.string.add_tab_actions, R.string.add_tab_link).forEachIndexed { i, label ->
@@ -68,16 +82,16 @@ fun AddItemSheet(onAdd: (Item) -> Unit, onDismiss: () -> Unit) {
                 }
             }
             when (tab) {
-                0 -> AppPicker(onAdd)
-                1 -> ActionPicker(onAdd)
-                else -> LinkForm(onAdd)
+                0 -> AppPicker(selected, toggle)
+                1 -> ActionPicker(selected, toggle)
+                else -> LinkPicker(selected, toggle, onAdd = { link -> onAdd(selected + link) })
             }
         }
     }
 }
 
 @Composable
-private fun AppPicker(onAdd: (Item) -> Unit) {
+private fun AppPicker(selected: List<Item>, onToggle: (Item) -> Unit) {
     val context = LocalContext.current
     val apps by produceState<List<AppEntry>?>(null) {
         value = withContext(Dispatchers.IO) { InstalledApps.load(context) }
@@ -102,45 +116,76 @@ private fun AppPicker(onAdd: (Item) -> Unit) {
     LazyColumn {
         items(filtered, key = { "${it.packageName}/${it.activityName}" }) { app ->
             val item = AppItem(app.label, app.packageName, app.activityName)
-            PickerRow(item, app.label) { onAdd(item) }
+            PickerRow(item, app.label, item in selected) { onToggle(item) }
         }
     }
 }
 
 @Composable
-private fun ActionPicker(onAdd: (Item) -> Unit) {
+private fun ActionPicker(selected: List<Item>, onToggle: (Item) -> Unit) {
     val context = LocalContext.current
     val (switches, shortcuts) = Action.entries.partition { it in SWITCH_ACTIONS }
     LazyColumn {
         listOf(R.string.action_group_shortcuts to shortcuts, R.string.action_group_switches to switches).forEach { (title, actions) ->
-            item(key = title) {
-                Text(
-                    stringResource(title),
-                    Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
+            item(key = title) { GroupTitle(stringResource(title)) }
             items(actions, key = { it.name }) { action ->
                 val item = ActionItem(context.getString(action.labelRes), action)
-                PickerRow(item, item.label) { onAdd(item) }
+                PickerRow(item, item.label, item in selected) { onToggle(item) }
             }
         }
     }
 }
 
 @Composable
-private fun PickerRow(item: Item, label: String, onClick: () -> Unit) {
+private fun GroupTitle(text: String) {
+    Text(
+        text,
+        Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+    )
+}
+
+@Composable
+private fun PickerRow(item: Item, label: String, checked: Boolean, onClick: () -> Unit) {
     ListItem(
         headlineContent = { Text(label) },
         leadingContent = { ItemIcon(item, 40.dp) },
+        trailingContent = { Checkbox(checked = checked, onCheckedChange = null) },
         modifier = Modifier.clickable(onClick = onClick),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
     )
 }
 
+/** A form for a link of your own, then ready-made links into the installed apps that have them. */
 @Composable
-private fun LinkForm(onAdd: (Item) -> Unit) {
+private fun LinkPicker(selected: List<Item>, onToggle: (Item) -> Unit, onAdd: (LinkItem) -> Unit) {
+    val context = LocalContext.current
+    val groups by produceState(emptyList<PresetGroup>()) {
+        value = withContext(Dispatchers.IO) { installedPresets(context) }
+    }
+    LazyColumn {
+        item(key = "form") { LinkForm(onAdd) }
+        if (groups.isNotEmpty()) item(key = "presets") { GroupTitle(stringResource(R.string.preset_section)) }
+        groups.forEach { group ->
+            item(key = group.appLabel) {
+                Text(
+                    group.appLabel,
+                    Modifier.padding(start = 16.dp, top = 8.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            items(group.presets, key = { it.uri }) { preset ->
+                val item = LinkItem(stringResource(preset.labelRes), preset.uri)
+                PickerRow(item, item.label, item in selected) { onToggle(item) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LinkForm(onAdd: (LinkItem) -> Unit) {
     var label by remember { mutableStateOf("") }
     var uri by remember { mutableStateOf("") }
     val valid = label.isNotBlank() && ItemLauncher.linkIntent(uri) != null

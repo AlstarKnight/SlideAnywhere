@@ -111,7 +111,16 @@
 
     <string name="add_tab_apps">应用</string>
     <string name="add_tab_actions">快捷方式</string>
-    <string name="add_tab_link">网址 / URI</string>
+    <string name="add_tab_link">链接</string>
+    <string name="add_selected">添加 %1$d 项</string>
+    <string name="preset_section">常用入口</string>
+    <string name="preset_scan">扫一扫</string>
+    <string name="preset_pay_code">付款码</string>
+    <string name="preset_receive_code">收款码</string>
+    <string name="preset_bus_code">乘车码</string>
+    <string name="preset_transfer">转账</string>
+    <string name="preset_ant_forest">蚂蚁森林</string>
+    <string name="preset_post_weibo">发微博</string>
     <string name="search_apps">搜索应用（支持拼音、首字母）</string>
     <string name="link_label">名称</string>
     <string name="link_uri">网址或 URI</string>
