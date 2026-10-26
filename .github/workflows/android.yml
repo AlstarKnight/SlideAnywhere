@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       HAS_SIGNING_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
@@ -52,3 +54,20 @@ jobs:
         with:
           name: slideanywhere-release-apk
           path: app/build/outputs/apk/release/*.apk
+
+      # Keeps one fixed download link for testers:
+      # https://github.com/<owner>/<repo>/releases/download/latest/SlideAnywhere.apk
+      - name: Update the "latest" pre-release
+        if: env.HAS_SIGNING_KEY == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/SlideAnywhere.apk"
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest "$RUNNER_TEMP/SlideAnywhere.apk" \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "SlideAnywhere 最新测试版" \
+            --notes "自动构建，来自分支 ${BRANCH}（构建提交 ${GITHUB_SHA::7}）。每次 CI 编译后都会替换。"
