@@ -77,3 +77,4 @@ SlideX 不联网，也不收集任何数据。
 - [Smart Edge](https://github.com/Imtiaz-Official/Smart-Edge)（MIT 许可）：边缘触发和悬浮面板的实现思路
 - Panels（Sidebar）：交互参考
 - [Material Symbols](https://github.com/google/material-design-icons)（Apache 2.0）：快捷操作和开关的图标
+- [Claude Code](https://claude.com/claude-code)：参与编写代码
