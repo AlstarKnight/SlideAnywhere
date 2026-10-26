@@ -33,11 +33,14 @@ object InstalledApps {
 
     fun cachedIcon(key: String): ImageBitmap? = icons.get(key)
 
-    /** Icon of an app's activity, falling back to the app icon. Call off the main thread. */
+    /** Forgets loaded icons, e.g. after the icon pack changed. */
+    fun clearIconCache() = icons.evictAll()
+
+    /** Icon of an app's activity from the chosen icon pack, else its own, else the app icon. Call off the main thread. */
     fun appIcon(context: Context, packageName: String, activityName: String, sizePx: Int): ImageBitmap? =
         icon("$packageName/$activityName", sizePx) {
             val pm = context.packageManager
-            try {
+            IconPacks.icon(context, packageName, activityName) ?: try {
                 pm.getActivityIcon(ComponentName(packageName, activityName))
             } catch (e: PackageManager.NameNotFoundException) {
                 try {

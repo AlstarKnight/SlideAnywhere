@@ -101,6 +101,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_SHOW_NOTIFICATION, true)
         set(value) = prefs.edit { putBoolean(KEY_SHOW_NOTIFICATION, value) }
 
+    /** Package of the chosen icon pack, or null for the apps' own icons. */
+    var iconPack: String?
+        get() = prefs.getString(KEY_ICON_PACK, null)
+        set(value) = prefs.edit { putString(KEY_ICON_PACK, value) }
+
     var themePreset: ThemePreset
         get() = enumPref(KEY_THEME_PRESET, ThemePreset.STARRY)
         set(value) = prefs.edit { putString(KEY_THEME_PRESET, value.name) }
@@ -139,6 +144,7 @@ class Prefs(context: Context) {
         const val KEY_BALL_TAP = "ball_tap"
         const val KEY_BALL_LONG_PRESS = "ball_long_press"
         const val KEY_SHOW_NOTIFICATION = "show_notification"
+        const val KEY_ICON_PACK = "icon_pack"
         const val KEY_THEME_PRESET = "theme_preset"
         const val KEY_DARK_MODE = "dark_mode"
     }

@@ -61,6 +61,9 @@
     <string name="dark_mode_system">跟随系统</string>
     <string name="dark_mode_light">浅色</string>
     <string name="dark_mode_dark">深色</string>
+    <string name="setting_icon_pack">图标包</string>
+    <string name="icon_pack_none">系统图标</string>
+    <string name="icon_pack_empty">没有找到图标包。安装支持 Nova 或 ADW 桌面的图标包后，会出现在这里。</string>
 
     <string name="section_panel">面板</string>
     <string name="setting_panel_width">负一屏宽度</string>

@@ -237,6 +237,7 @@ fun SettingsScreen(prefs: Prefs) {
                     darkMode = it
                     prefs.darkMode = it
                 }
+                IconPackChoice(prefs)
             }
 
             SectionTitle(stringResource(R.string.section_panel))
@@ -360,6 +361,62 @@ private fun ActionChoice(title: String, selected: Action?, onSelect: (Action?) -
                         Text(actionLabel(option), Modifier.padding(start = 12.dp))
                     }
                 }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { picking = false }) { Text(stringResource(R.string.cancel)) }
+        },
+    )
+}
+
+/** A row naming the icon pack in use; tapping it lists the installed packs. */
+@Composable
+private fun IconPackChoice(prefs: Prefs) {
+    val context = LocalContext.current
+    val packs by produceState<List<IconPackEntry>?>(null) {
+        value = withContext(Dispatchers.IO) { IconPacks.installed(context) }
+    }
+    var selected by remember { mutableStateOf(prefs.iconPack) }
+    var picking by remember { mutableStateOf(false) }
+    val systemIcons = stringResource(R.string.icon_pack_none)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable { picking = true }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(stringResource(R.string.setting_icon_pack), Modifier.weight(1f))
+        Text(
+            packs?.firstOrNull { it.packageName == selected }?.label ?: systemIcons,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+    if (!picking) return
+    val options = listOf<IconPackEntry?>(null) + packs.orEmpty()
+    AlertDialog(
+        onDismissRequest = { picking = false },
+        title = { Text(stringResource(R.string.setting_icon_pack)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                options.forEach { option ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                selected = option?.packageName
+                                prefs.iconPack = selected
+                                InstalledApps.clearIconCache()
+                                picking = false
+                            }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = option?.packageName == selected, onClick = null)
+                        Text(option?.label ?: systemIcons, Modifier.padding(start = 12.dp))
+                    }
+                }
+                if (packs?.isEmpty() == true) Hint(stringResource(R.string.icon_pack_empty))
             }
         },
         confirmButton = {
