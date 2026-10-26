@@ -42,6 +42,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Started from the panel; its own task, so closing it returns to the app that was in front. -->
+        <activity
+            android:name=".WidgetPickerActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="" />
+
         <service
             android:name=".PanelService"
             android:exported="false"

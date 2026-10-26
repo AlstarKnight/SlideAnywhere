@@ -27,8 +27,17 @@ fun PanelConfig.renameCard(cardId: String, title: String): PanelConfig = mapCard
         is NoteCard -> it.copy(title = title)
         is SystemCard -> it.copy(title = title)
         is UsageCard -> it.copy(title = title)
+        is WidgetCard -> it.copy(title = title)
     }
 }
+
+fun PanelConfig.setWidgetHeight(cardId: String, heightDp: Int): PanelConfig = mapCard(cardId) {
+    if (it is WidgetCard) it.copy(heightDp = heightDp.coerceIn(WIDGET_HEIGHT_RANGE)) else it
+}
+
+/** Widget ids still used by a card; any other id the panel's widget host holds can be freed. */
+fun PanelConfig.widgetIds(): Set<Int> =
+    pages.flatMap { it.cards }.filterIsInstance<WidgetCard>().mapTo(mutableSetOf()) { it.widgetId }
 
 fun PanelConfig.setColumns(cardId: String, columns: Int): PanelConfig = mapCard(cardId) {
     when (it) {

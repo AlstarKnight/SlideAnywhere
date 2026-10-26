@@ -61,7 +61,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             stopSelf()
             return START_NOT_STICKY
         }
-        if (intent?.action == ACTION_OPEN_PANEL) openPanel(ball?.side ?: prefs.side)
+        if (intent?.action == ACTION_OPEN_PANEL) openPanel(ball?.side ?: prefs.side, intent.getIntExtra(EXTRA_PAGE, 0))
         return START_STICKY
     }
 
@@ -202,12 +202,13 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
         }
     }
 
-    private fun openPanel(side: Side) {
+    private fun openPanel(side: Side, page: Int = 0) {
         if (panel != null || (handle == null && ball == null)) return
         panel = PanelWindow(
             context = this,
             windowManager = windowManager,
             side = side,
+            initialPage = page,
             widthFraction = prefs.panelWidthPercent / 100f,
             blurBehind = prefs.panelBlur,
             store = ConfigStore.get(this),
@@ -248,6 +249,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
         private const val CHANNEL_ID = "service"
         private const val NOTIFICATION_ID = 1
         private const val ACTION_OPEN_PANEL = "io.github.alstarknight.slidex.OPEN_PANEL"
+        private const val EXTRA_PAGE = "page"
 
         fun start(context: Context) {
             val intent = Intent(context, PanelService::class.java)
@@ -260,6 +262,17 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             } catch (e: IllegalStateException) {
                 // Android can refuse to start services from the background; opening the app starts it again.
                 Log.w(TAG, "Cannot start the service", e)
+            }
+        }
+
+        /** Opens the panel on [page], e.g. to show a card that was just added outside it. */
+        fun openPanel(context: Context, page: Int) {
+            if (!Prefs(context).serviceEnabled) return
+            val intent = Intent(context, PanelService::class.java).setAction(ACTION_OPEN_PANEL).putExtra(EXTRA_PAGE, page)
+            try {
+                context.startService(intent)
+            } catch (e: IllegalStateException) {
+                Log.w(TAG, "Cannot open the panel", e)
             }
         }
 

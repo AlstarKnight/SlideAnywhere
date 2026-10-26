@@ -56,6 +56,19 @@ data class UsageCard(
 @Serializable
 enum class UsageKind { RECENT, FREQUENT }
 
+/** Another app's home-screen widget, hosted in the panel under the system-assigned [widgetId]. */
+@Serializable
+@SerialName("widget")
+data class WidgetCard(
+    override val id: String,
+    override val title: String,
+    val widgetId: Int,
+    val heightDp: Int = DEFAULT_WIDGET_HEIGHT,
+) : Card
+
+const val DEFAULT_WIDGET_HEIGHT = 180
+val WIDGET_HEIGHT_RANGE = 60..480
+
 @Serializable
 sealed interface Item {
     val label: String

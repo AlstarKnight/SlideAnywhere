@@ -110,4 +110,17 @@ class ConfigTest {
         assertEquals(5, (withUsage.setColumns("u", 5).pages[1].cards[0] as UsageCard).columns)
         assertEquals(COLUMN_RANGE.last, (withUsage.setColumns("u", 9).pages[1].cards[0] as UsageCard).columns)
     }
+
+    @Test
+    fun widgetCardsRoundTripResizeAndListTheirIds() {
+        val clock = WidgetCard("w", "时钟", widgetId = 7)
+        val withWidget = config.addCard(1, clock).addCard(0, WidgetCard("x", "天气", widgetId = 9, heightDp = 100))
+        assertEquals(withWidget, parseConfig(withWidget.toJson()))
+        assertEquals(setOf(7, 9), withWidget.widgetIds())
+        assertEquals(setOf(9), withWidget.removeCard("w").widgetIds())
+        fun heightAfter(dp: Int) = (withWidget.setWidgetHeight("w", dp).pages[1].cards[0] as WidgetCard).heightDp
+        assertEquals(240, heightAfter(240))
+        assertEquals(WIDGET_HEIGHT_RANGE.last, heightAfter(2000))
+        assertEquals(WIDGET_HEIGHT_RANGE.first, heightAfter(0))
+    }
 }

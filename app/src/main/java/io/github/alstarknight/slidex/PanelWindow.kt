@@ -27,6 +27,7 @@ class PanelWindow(
     private val context: Context,
     private val windowManager: WindowManager,
     private val side: Side,
+    private val initialPage: Int,
     private val widthFraction: Float,
     private val blurBehind: Boolean,
     private val store: ConfigStore,
@@ -40,6 +41,7 @@ class PanelWindow(
 
     fun show() {
         owner.start()
+        WidgetHost.get(context).startListening()
         val root = PanelRootView(context, onBack = ::onBack)
         root.setViewTreeLifecycleOwner(owner)
         root.setViewTreeSavedStateRegistryOwner(owner)
@@ -57,6 +59,7 @@ class PanelWindow(
                         PanelContent(
                             store = store,
                             launcher = launcher,
+                            initialPage = initialPage,
                             onOpenSettings = {
                                 hide()
                                 onOpenSettings()
@@ -91,6 +94,7 @@ class PanelWindow(
         this.root = null
         windowManager.removeView(root)
         owner.destroy()
+        WidgetHost.get(context).stopListening()
         onClosed()
     }
 

@@ -621,6 +621,7 @@ private fun importConfig(context: Context, uri: Uri, store: ConfigStore): Int {
         val stream = context.contentResolver.openInputStream(uri) ?: return R.string.config_io_failed
         val config = parseConfig(stream.use { it.readBytes().decodeToString() })
         store.update { config }
+        WidgetHost.deleteUnused(context, config)
         return R.string.config_imported
     } catch (e: IOException) {
         return R.string.config_io_failed

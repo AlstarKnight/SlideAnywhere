@@ -1,19 +1,24 @@
 package io.github.alstarknight.slidex
 
+import android.appwidget.AppWidgetManager
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -60,6 +65,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -69,19 +75,27 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** The panel itself: swipeable pages of cards, with an edit mode for changing them. */
 @Composable
-fun PanelContent(store: ConfigStore, launcher: ItemLauncher, onOpenSettings: () -> Unit, onClose: () -> Unit) {
+fun PanelContent(
+    store: ConfigStore,
+    launcher: ItemLauncher,
+    initialPage: Int,
+    onOpenSettings: () -> Unit,
+    onClose: () -> Unit,
+) {
+    val context = LocalContext.current
     val config by store.config.collectAsState()
     val switches by launcher.switches.collectAsState()
     var editing by remember { mutableStateOf(false) }
     var addingToCard by remember { mutableStateOf<String?>(null) }
     var showingDrawer by remember { mutableStateOf(false) }
-    val pagerState = rememberPagerState { config.pages.size }
+    val pagerState = rememberPagerState(initialPage.coerceIn(0, config.pages.lastIndex)) { config.pages.size }
     val scope = rememberCoroutineScope()
     val extras = LocalThemeExtras.current
 
@@ -170,11 +184,19 @@ fun PanelContent(store: ConfigStore, launcher: ItemLauncher, onOpenSettings: () 
                                 onAddUsage = { kind, title ->
                                     store.update { c -> c.addCard(pageIndex, UsageCard(ConfigStore.newId(), title, kind)) }
                                 },
+                                onAddWidget = {
+                                    val intent = WidgetPickerActivity.intent(context, pageIndex)
+                                    context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                                    onClose()
+                                },
                                 onAddPage = {
                                     store.update { it.addPage() }
                                     scope.launch { pagerState.animateScrollToPage(config.pages.size) }
                                 },
-                                onDeletePage = { store.update { it.removePage(pageIndex) } },
+                                onDeletePage = {
+                                    store.update { it.removePage(pageIndex) }
+                                    WidgetHost.deleteUnused(context, store.config.value)
+                                },
                                 onMovePage = { offset ->
                                     store.update { it.movePage(pageIndex, offset) }
                                     scope.launch { pagerState.scrollToPage(pageIndex + offset) }
@@ -246,6 +268,7 @@ private fun PanelCard(
                 is NoteCard -> NoteField(card, store)
                 is SystemCard -> SystemCardContent(card.kind, onClose)
                 is UsageCard -> UsageCardContent(card, editing, store, onLaunch, onClose)
+                is WidgetCard -> WidgetCardContent(card, editing, store, onClose)
             }
         }
     }
@@ -298,19 +321,81 @@ private fun UsageCardContent(
 
 private const val USAGE_ROWS = 2
 
+/** Another app's widget. A tap on it usually opens that app, so the panel closes to show it. */
+@Composable
+private fun WidgetCardContent(card: WidgetCard, editing: Boolean, store: ConfigStore, onClose: () -> Unit) {
+    val context = LocalContext.current
+    if (editing) {
+        val text = stringResource(R.string.widget_height, card.heightDp)
+        Stepper(text, card.heightDp, WIDGET_HEIGHT_RANGE, WIDGET_HEIGHT_STEP) { dp ->
+            store.update { it.setWidgetHeight(card.id, dp) }
+        }
+    }
+    val info = remember(card.widgetId) { AppWidgetManager.getInstance(context).getAppWidgetInfo(card.widgetId) }
+    if (info == null) {
+        Text(
+            stringResource(R.string.widget_missing),
+            Modifier.padding(bottom = 8.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    BoxWithConstraints(
+        Modifier
+            .fillMaxWidth()
+            .height(card.heightDp.dp)
+            .padding(bottom = 8.dp)
+            .then(if (editing) Modifier else Modifier.observeTaps(onClose)),
+    ) {
+        val width = maxWidth.value
+        val height = maxHeight.value
+        AndroidView(
+            factory = { WidgetHost.get(it).createView(it, card.widgetId, info) },
+            modifier = Modifier.fillMaxSize(),
+            update = { it.updateSize(width, height) },
+        )
+    }
+}
+
+private const val WIDGET_HEIGHT_STEP = 20
+
+/** Calls [onTap] after a tap anywhere inside, without taking the touch from the views underneath. */
+private fun Modifier.observeTaps(onTap: () -> Unit) = pointerInput(onTap) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        while (true) {
+            val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+            val moved = (change.position - down.position).getDistance() > viewConfiguration.touchSlop
+            val held = change.uptimeMillis - down.uptimeMillis > viewConfiguration.longPressTimeoutMillis
+            if (moved || held) break
+            if (!change.pressed) {
+                onTap()
+                break
+            }
+        }
+    }
+}
+
 @Composable
 private fun ColumnsStepper(columns: Int, onChange: (Int) -> Unit) {
+    Stepper(stringResource(R.string.card_columns, columns), columns, COLUMN_RANGE, onChange = onChange)
+}
+
+/** A label with "fewer" and "more" buttons that change [value] by [step] within [range]. */
+@Composable
+private fun Stepper(text: String, value: Int, range: IntRange, step: Int = 1, onChange: (Int) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
-            stringResource(R.string.card_columns, columns),
+            text,
             Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        TextButton(onClick = { onChange(columns - 1) }, enabled = columns > COLUMN_RANGE.first) {
+        TextButton(onClick = { onChange(value - step) }, enabled = value > range.first) {
             Text(stringResource(R.string.card_columns_fewer))
         }
-        TextButton(onClick = { onChange(columns + 1) }, enabled = columns < COLUMN_RANGE.last) {
+        TextButton(onClick = { onChange(value + step) }, enabled = value < range.last) {
             Text(stringResource(R.string.card_columns_more))
         }
     }
@@ -318,6 +403,7 @@ private fun ColumnsStepper(columns: Int, onChange: (Int) -> Unit) {
 
 @Composable
 private fun CardHeader(card: Card, editing: Boolean, onStartEditing: () -> Unit, store: ConfigStore) {
+    val context = LocalContext.current
     var renaming by remember(card.id) { mutableStateOf(false) }
     if (editing && renaming) {
         var title by remember(card.id) { mutableStateOf(card.title) }
@@ -353,7 +439,10 @@ private fun CardHeader(card: Card, editing: Boolean, onStartEditing: () -> Unit,
             SmallIconButton(Icons.Default.KeyboardArrowUp, R.string.card_move_up) { store.update { it.moveCard(card.id, -1) } }
             SmallIconButton(Icons.Default.KeyboardArrowDown, R.string.card_move_down) { store.update { it.moveCard(card.id, 1) } }
             SmallIconButton(Icons.Default.Edit, R.string.card_rename) { renaming = true }
-            SmallIconButton(Icons.Default.Delete, R.string.card_delete) { store.update { it.removeCard(card.id) } }
+            SmallIconButton(Icons.Default.Delete, R.string.card_delete) {
+                store.update { it.removeCard(card.id) }
+                if (card is WidgetCard) WidgetHost.deleteUnused(context, store.config.value)
+            }
         }
     }
 }
@@ -573,6 +662,7 @@ private fun PageEditor(
     onAddNote: (String) -> Unit,
     onAddSystem: (SystemKind, String) -> Unit,
     onAddUsage: (UsageKind, String) -> Unit,
+    onAddWidget: () -> Unit,
     onAddPage: () -> Unit,
     onDeletePage: () -> Unit,
     onMovePage: (Int) -> Unit,
@@ -597,6 +687,7 @@ private fun PageEditor(
             R.string.page_add_recent_card to { onAddUsage(UsageKind.RECENT, recentTitle) },
             R.string.page_add_frequent_card to { onAddUsage(UsageKind.FREQUENT, frequentTitle) },
         )
+        ButtonRow(R.string.page_add_widget_card to onAddWidget)
         ButtonRow(
             R.string.page_add to onAddPage,
             R.string.page_delete to onDeletePage.takeIf { canDelete },

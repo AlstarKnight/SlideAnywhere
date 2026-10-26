@@ -100,6 +100,7 @@
     <string name="page_add_storage_card">添加内存与存储</string>
     <string name="page_add_recent_card">添加最近使用</string>
     <string name="page_add_frequent_card">添加常用应用</string>
+    <string name="page_add_widget_card">添加小部件</string>
     <string name="page_add">新建一页</string>
     <string name="page_delete">删除该页</string>
     <string name="page_move_left">向左移动</string>
@@ -182,6 +183,12 @@
     <string name="usage_frequent">常用应用</string>
     <string name="usage_empty">最近一周还没有使用记录</string>
     <string name="needs_usage_access">需要「使用情况访问」权限</string>
+    <string name="widget_picker_title">选择小部件</string>
+    <string name="widget_none">没有可以添加的小部件</string>
+    <string name="widget_option_details">%1$s · %2$d×%3$d</string>
+    <string name="widget_failed">无法设置这个小部件</string>
+    <string name="widget_missing">这个小部件已失效（可能对应的应用被卸载了），可以删除这张卡片。</string>
+    <string name="widget_height">高度 %d dp</string>
     <string name="launch_failed">无法打开</string>
 
     <string name="accessibility_label">SlideX 快捷操作</string>
