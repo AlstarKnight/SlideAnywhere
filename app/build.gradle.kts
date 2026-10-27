@@ -35,7 +35,8 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.findByName("release")
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -47,6 +48,11 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    // The app is Chinese only; this drops the other ~80 languages the Compose libraries bring.
+    androidResources {
+        localeFilters += listOf("zh-rCN", "zh-rHK", "zh-rTW")
     }
 }
 
@@ -63,11 +69,9 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.core)
-    implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.savedstate)
     implementation(libs.kotlinx.serialization.json)
-    debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)
 }
