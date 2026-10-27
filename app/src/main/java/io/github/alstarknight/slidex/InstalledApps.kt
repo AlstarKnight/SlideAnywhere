@@ -86,8 +86,8 @@ object InstalledApps {
     }
 }
 
-/** Pinyin of Chinese characters for app search, from the system's transliterator (Android 10+). */
-private object Pinyin {
+/** Pinyin of Chinese characters for app and widget search, from the system's transliterator (Android 10+). */
+object Pinyin {
     private val cache = HashMap<Char, String>()
 
     @Synchronized

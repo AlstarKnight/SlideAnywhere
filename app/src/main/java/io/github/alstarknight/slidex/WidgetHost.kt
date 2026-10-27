@@ -68,6 +68,8 @@ class WidgetOption(
     val columns: Int,
     val rows: Int,
     val preview: ImageBitmap?,
+    /** Finds the widget by its app's name and its own, e.g. "微信付款码". */
+    val search: SearchKey,
 )
 
 /** Every installed widget with its preview image, sorted by app. Call off the main thread. */
@@ -80,13 +82,16 @@ fun loadWidgetOptions(context: Context, previewSizePx: Int): List<WidgetOption> 
     return manager.installedProviders
         .map { info ->
             val preview = info.loadPreviewImage(context, densityDpi) ?: info.loadIcon(context, densityDpi)
+            val label = info.loadLabel(pm)
+            val appName = appLabel(pm, info.provider.packageName)
             WidgetOption(
                 info = info,
-                label = info.loadLabel(pm),
-                appLabel = appLabel(pm, info.provider.packageName),
+                label = label,
+                appLabel = appName,
                 columns = WidgetHost.cells(info.minWidth / density),
                 rows = WidgetHost.cells(info.minHeight / density),
                 preview = preview?.scaledTo(previewSizePx),
+                search = searchKey(appName + label, info.provider.packageName, Pinyin::syllable),
             )
         }
         .sortedWith { a, b -> collator.compare(a.appLabel, b.appLabel).takeIf { it != 0 } ?: collator.compare(a.label, b.label) }
