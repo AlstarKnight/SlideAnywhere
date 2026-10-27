@@ -16,6 +16,9 @@
     <string name="page_theme">主题外观</string>
     <string name="page_theme_summary">主题、深浅色、图标包、面板宽度、模糊和遮罩</string>
     <string name="page_style">页面外观</string>
+    <string name="scene_title">情景模式</string>
+    <string name="scene_apps">在这些应用里先显示本页</string>
+    <string name="scene_hint">在选中的应用里打开面板时，直接显示这一页，而不是第一页。一个应用只对应一页。</string>
     <string name="page_advanced">高级设置</string>
     <string name="page_advanced_summary">黑名单/白名单、横屏隐藏、磁贴和桌面快捷方式、通知</string>
     <string name="page_config">配置管理</string>
@@ -32,15 +35,20 @@
     <string name="permission_battery">忽略电池优化</string>
     <string name="permission_battery_desc">尽量避免后台被系统关闭</string>
     <string name="permission_accessibility">无障碍服务</string>
-    <string name="permission_accessibility_desc">锁屏、截屏、通知栏、最近任务、分屏、电源菜单等快捷方式，黑名单/白名单，以及悬浮图标避开键盘需要。开不了的话，先到系统的应用信息页，在右上角菜单里选「允许受限设置」</string>
+    <string name="permission_accessibility_desc">锁屏、截屏、通知栏、最近任务、分屏、电源菜单等快捷方式，黑名单/白名单、情景模式，以及悬浮图标避开键盘需要。开不了的话，先到系统的应用信息页，在右上角菜单里选「允许受限设置」</string>
     <string name="permission_write_settings">修改系统设置</string>
     <string name="permission_write_settings_desc">自动旋转、自动亮度开关和亮度条需要</string>
     <string name="permission_dnd">勿扰权限</string>
     <string name="permission_dnd_desc">静音开关需要</string>
     <string name="permission_usage">使用情况访问</string>
-    <string name="permission_usage_desc">「最近使用」「常用应用」卡片需要，只读取各应用的使用时间</string>
+    <string name="permission_usage_desc">「最近使用」「常用应用」「使用时长」卡片需要，只读取各应用的使用时间</string>
     <string name="permission_granted">已开启</string>
     <string name="permission_grant">去开启</string>
+    <string name="permission_shizuku">Shizuku（可选）</string>
+    <string name="permission_shizuku_desc">装好并启动 Shizuku 后，WLAN、蓝牙、移动数据、定位、NFC 和飞行模式开关会直接切换，不再跳到系统设置</string>
+    <string name="shizuku_not_installed">还没安装 Shizuku，点「去开启」打开它的网站下载</string>
+    <string name="shizuku_not_running">Shizuku 没有在运行，点「去开启」打开它并启动</string>
+    <string name="shizuku_no_permission">点「去开启」允许 SlideX 使用 Shizuku</string>
 
     <string name="section_trigger_mode">触发</string>
     <string name="section_position">位置</string>
@@ -156,6 +164,7 @@
     <string name="default_card_text">文字</string>
     <string name="default_card_hitokoto">一言</string>
     <string name="default_card_switches">开关</string>
+    <string name="default_card_screen_time">今日使用</string>
     <string name="new_grid_card_title">新卡片</string>
 
     <string name="card_drag">按住拖动排序</string>
@@ -188,6 +197,7 @@
     <string name="page_add_recent_card">添加最近使用</string>
     <string name="page_add_frequent_card">添加常用应用</string>
     <string name="page_add_widget_card">添加小部件</string>
+    <string name="page_add_screen_time_card">添加使用时长</string>
     <string name="page_add">新建一页</string>
     <string name="page_delete">删除该页</string>
     <string name="page_move_left">向左移动</string>
@@ -241,6 +251,8 @@
     <string name="action_nfc">NFC</string>
     <string name="action_airplane_mode">飞行模式</string>
     <string name="action_auto_rotate">自动旋转</string>
+    <string name="action_force_landscape">强制横屏</string>
+    <string name="action_force_portrait">强制竖屏</string>
     <string name="action_auto_brightness">自动亮度</string>
     <string name="action_keep_screen_on">屏幕常亮</string>
     <string name="action_eye_care">全局护眼</string>
@@ -255,6 +267,7 @@
     <string name="action_needs_accessibility">请先开启 SlideX 的无障碍服务</string>
     <string name="action_needs_android_9">仅支持 Android 9 及以上的系统</string>
     <string name="action_failed">操作失败</string>
+    <string name="shizuku_failed">Shizuku 没能切换，请到系统设置里切换</string>
     <string name="needs_write_settings">需要「修改系统设置」权限</string>
     <string name="needs_dnd_access">静音需要「勿扰」权限，请允许 SlideX</string>
 
@@ -284,6 +297,11 @@
     <string name="usage_frequent">常用应用</string>
     <string name="usage_empty">最近一周还没有使用记录</string>
     <string name="needs_usage_access">需要「使用情况访问」权限</string>
+    <string name="screen_time_total">今天共用了 %s</string>
+    <string name="screen_time_empty">今天还没有使用记录</string>
+    <string name="duration_under_minute">不到 1 分钟</string>
+    <string name="duration_minutes">%d 分钟</string>
+    <string name="duration_hours_minutes">%1$d 小时 %2$d 分钟</string>
     <string name="widget_picker_title">选择小部件</string>
     <string name="widget_none">没有可以添加的小部件</string>
     <string name="widget_option_details">%1$s · %2$d×%3$d</string>
@@ -297,7 +315,7 @@
     <string name="config_hint">配置包含所有页面和卡片，导出为 JSON 文件后，换机或重装时可以导入。设置项和背景图片不在其中。</string>
     <string name="about_version">%1$s %2$s</string>
     <string name="about_project">项目主页</string>
-    <string name="about_credits">功能和交互参考已停更的「全局负一屏」，边缘触发参考 Smart Edge（MIT），图标来自 Material Symbols（Apache 2.0）。</string>
+    <string name="about_credits">功能和交互参考已停更的「全局负一屏」，边缘触发参考 Smart Edge（MIT），图标来自 Material Symbols（Apache 2.0），系统开关借助 Shizuku（MIT）。</string>
     <string name="config_export">导出配置</string>
     <string name="config_import">导入配置</string>
     <string name="config_exported">配置已导出</string>

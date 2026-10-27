@@ -108,6 +108,8 @@ private data class Permissions(
     val dnd: Boolean,
     val usage: Boolean,
     val battery: Boolean,
+    /** Optional, so it is not counted as missing. */
+    val shizuku: ShizukuShell.State,
 ) {
     val missing: Int
         get() = listOf(overlay, notifications, accessibility, writeSettings, dnd, usage, battery).count { !it }
@@ -121,6 +123,7 @@ private fun readPermissions(context: Context) = Permissions(
     dnd = context.getSystemService(NotificationManager::class.java).isNotificationPolicyAccessGranted,
     usage = UsageApps.hasAccess(context),
     battery = context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName),
+    shizuku = ShizukuShell.state(context),
 )
 
 @Composable
@@ -326,6 +329,28 @@ private fun PermissionSettings(permissions: Permissions, onChanged: () -> Unit) 
             description = stringResource(R.string.permission_battery_desc),
             granted = permissions.battery,
         ) { context.startActivity(batteryOptimizationIntent(context)) }
+        val shizukuStatus = when (permissions.shizuku) {
+            ShizukuShell.State.NOT_INSTALLED -> R.string.shizuku_not_installed
+            ShizukuShell.State.NOT_RUNNING -> R.string.shizuku_not_running
+            ShizukuShell.State.NO_PERMISSION -> R.string.shizuku_no_permission
+            ShizukuShell.State.READY -> null
+        }
+        PermissionRow(
+            title = stringResource(R.string.permission_shizuku),
+            description = stringResource(R.string.permission_shizuku_desc) +
+                shizukuStatus?.let { "\n" + stringResource(it) }.orEmpty(),
+            granted = permissions.shizuku == ShizukuShell.State.READY,
+        ) {
+            when (permissions.shizuku) {
+                ShizukuShell.State.NO_PERMISSION -> ShizukuShell.requestPermission(context)
+                ShizukuShell.State.NOT_RUNNING -> if (!ShizukuShell.openManager(context)) onChanged()
+                else -> try {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, SHIZUKU_SITE.toUri()))
+                } catch (e: ActivityNotFoundException) {
+                    toast(context, R.string.launch_failed)
+                }
+            }
+        }
     }
 }
 
@@ -596,6 +621,7 @@ private fun AboutSettings() {
 }
 
 private const val PROJECT_URL = "https://github.com/AlstarKnight/SlideX"
+private const val SHIZUKU_SITE = "https://shizuku.rikka.app/"
 
 /** A row showing what a gesture does; tapping it lists "open the panel" and every action to pick from. */
 @Composable
@@ -739,10 +765,28 @@ private fun AppListRow(prefs: Prefs, mode: AppListMode) {
 
 @Composable
 private fun AppListDialog(title: String, selected: Set<String>, onDone: (Set<String>) -> Unit, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(Modifier.fillMaxHeight(0.85f), shape = MaterialTheme.shapes.extraLarge) {
+            AppChecklist(title, selected, onDone, onDismiss)
+        }
+    }
+}
+
+/**
+ * Every app with a box to tick, searchable, the [selected] ones first; home screens are listed too, so a setting can
+ * apply to (or leave out) the home screen.
+ */
+@Composable
+fun AppChecklist(
+    title: String,
+    selected: Set<String>,
+    onDone: (Set<String>) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val apps by produceState<List<AppEntry>?>(null) {
         value = withContext(Dispatchers.IO) {
-            // Home screens are listed too, so the trigger can be kept off (or only on) the home screen.
             val all = InstalledApps.load(context) + InstalledApps.load(context, Intent.CATEGORY_HOME)
             // Apps already chosen come first, so they are easy to find and untick.
             all.distinctBy { it.packageName }.sortedBy { it.packageName !in selected }
@@ -750,54 +794,50 @@ private fun AppListDialog(title: String, selected: Set<String>, onDone: (Set<Str
     }
     var checked by remember { mutableStateOf(selected) }
     var query by remember { mutableStateOf("") }
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(Modifier.fillMaxHeight(0.85f), shape = MaterialTheme.shapes.extraLarge) {
-            Column(Modifier.padding(vertical = 16.dp)) {
-                Text(
-                    title,
-                    Modifier.padding(horizontal = 24.dp),
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    singleLine = true,
-                    placeholder = { Text(stringResource(R.string.search_apps)) },
-                )
-                val list = apps
-                if (list == null) {
-                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                } else {
-                    val filtered = searchApps(list, query) { it.search }
-                    LazyColumn(Modifier.weight(1f)) {
-                        items(filtered, key = { it.packageName }) { app ->
-                            val on = app.packageName in checked
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable { checked = if (on) checked - app.packageName else checked + app.packageName }
-                                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Checkbox(checked = on, onCheckedChange = null)
-                                Box(Modifier.padding(horizontal = 12.dp)) {
-                                    ItemIcon(AppItem(app.label, app.packageName, app.activityName), 32.dp)
-                                }
-                                Text(app.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
+    Column(modifier.padding(vertical = 16.dp)) {
+        Text(
+            title,
+            Modifier.padding(horizontal = 24.dp),
+            style = MaterialTheme.typography.titleLarge,
+        )
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            singleLine = true,
+            placeholder = { Text(stringResource(R.string.search_apps)) },
+        )
+        val list = apps
+        if (list == null) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else {
+            val filtered = searchApps(list, query) { it.search }
+            LazyColumn(Modifier.weight(1f)) {
+                items(filtered, key = { it.packageName }) { app ->
+                    val on = app.packageName in checked
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { checked = if (on) checked - app.packageName else checked + app.packageName }
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(checked = on, onCheckedChange = null)
+                        Box(Modifier.padding(horizontal = 12.dp)) {
+                            ItemIcon(AppItem(app.label, app.packageName, app.activityName), 32.dp)
                         }
+                        Text(app.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                }
-                Row(Modifier.align(Alignment.End).padding(horizontal = 16.dp)) {
-                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-                    TextButton(onClick = { onDone(checked) }) { Text(stringResource(R.string.done)) }
                 }
             }
+        }
+        Row(Modifier.align(Alignment.End).padding(horizontal = 16.dp)) {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = { onDone(checked) }) { Text(stringResource(R.string.done)) }
         }
     }
 }

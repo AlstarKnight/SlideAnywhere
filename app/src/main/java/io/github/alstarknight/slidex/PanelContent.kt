@@ -55,6 +55,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -126,6 +127,8 @@ fun PanelContent(
     // The icon being renamed: its card's id and its index in the card.
     var renamingItem by remember { mutableStateOf<Pair<String, Int>?>(null) }
     var showingDrawer by remember { mutableStateOf(false) }
+    // The page whose scene apps are being picked.
+    var pickingSceneApps by remember { mutableStateOf<Int?>(null) }
     val pagerState = rememberPagerState(initialPage.coerceIn(0, config.pages.lastIndex)) { config.pages.size }
     val scope = rememberCoroutineScope()
     // The look chosen in the settings; a page can have a look of its own on top of it.
@@ -237,6 +240,7 @@ fun PanelContent(
                                         onAddUsage = { kind, title ->
                                             addCard(UsageCard(ConfigStore.newId(), title, kind))
                                         },
+                                        onAddScreenTime = { addCard(ScreenTimeCard(ConfigStore.newId(), it)) },
                                         onAddWidget = {
                                             val intent = WidgetPickerActivity.intent(context, pageIndex)
                                             context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -264,6 +268,7 @@ fun PanelContent(
                                         onClose()
                                     }
                                 }
+                                item { SceneEditor(page.sceneApps) { pickingSceneApps = pageIndex } }
                             }
                         }
                     }
@@ -294,6 +299,22 @@ fun PanelContent(
                 },
                 onDismiss = { showingDrawer = false },
             )
+        }
+        pickingSceneApps?.let { pageIndex ->
+            val close = { pickingSceneApps = null }
+            BackHandler(onBack = close)
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceContainer) {
+                AppChecklist(
+                    title = stringResource(R.string.scene_apps),
+                    selected = config.pages.getOrNull(pageIndex)?.sceneApps.orEmpty(),
+                    onDone = { apps ->
+                        store.update { it.setSceneApps(pageIndex, apps) }
+                        close()
+                    },
+                    onDismiss = close,
+                    modifier = Modifier.safeDrawingPadding(),
+                )
+            }
         }
         addingToCard?.let { cardId ->
             AddItemSheet(
@@ -482,6 +503,7 @@ private fun PanelCard(
                 is HitokotoCard -> HitokotoContent(onStartEditing)
                 is SystemCard -> SystemCardContent(card.kind, onClose)
                 is UsageCard -> UsageCardContent(card, editing, store, onLaunch, onClose)
+                is ScreenTimeCard -> ScreenTimeContent(onLaunch, onClose)
                 is WidgetCard -> WidgetCardContent(card, editing, onClose)
             }
             if (editing) CardStyleControls(card, store)
@@ -1115,6 +1137,7 @@ private fun PageEditor(
     onAddHitokoto: (String) -> Unit,
     onAddSystem: (SystemKind, String) -> Unit,
     onAddUsage: (UsageKind, String) -> Unit,
+    onAddScreenTime: (String) -> Unit,
     onAddWidget: () -> Unit,
     onAddPage: () -> Unit,
     onDeletePage: () -> Unit,
@@ -1127,6 +1150,7 @@ private fun PageEditor(
     val systemTitles = SystemKind.entries.associateWith { stringResource(it.labelRes) }
     val recentTitle = stringResource(R.string.usage_recent)
     val frequentTitle = stringResource(R.string.usage_frequent)
+    val screenTimeTitle = stringResource(R.string.default_card_screen_time)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ButtonRow(
             R.string.page_add_grid_card to { onAddGrid(gridTitle) },
@@ -1146,7 +1170,10 @@ private fun PageEditor(
             R.string.page_add_text_card to { onAddText(textTitle) },
             R.string.page_add_hitokoto_card to { onAddHitokoto(hitokotoTitle) },
         )
-        ButtonRow(R.string.page_add_widget_card to onAddWidget)
+        ButtonRow(
+            R.string.page_add_screen_time_card to { onAddScreenTime(screenTimeTitle) },
+            R.string.page_add_widget_card to onAddWidget,
+        )
         ButtonRow(
             R.string.page_add to onAddPage,
             R.string.page_delete to onDeletePage.takeIf { canDelete },
