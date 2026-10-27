@@ -157,31 +157,59 @@ private fun PickerRow(item: Item, label: String, checked: Boolean, onClick: () -
     )
 }
 
-/** A form for a link of your own, then ready-made links into the installed apps that have them. */
+/**
+ * A form for a link of your own, then ready-made links into the installed apps that have them, then the shortcuts
+ * the apps declare for a long press on their icons.
+ */
 @Composable
 private fun LinkPicker(selected: List<Item>, onToggle: (Item) -> Unit, onAdd: (LinkItem) -> Unit) {
     val context = LocalContext.current
     val groups by produceState(emptyList<PresetGroup>()) {
         value = withContext(Dispatchers.IO) { installedPresets(context) }
     }
+    val shortcutGroups by produceState(emptyList<ShortcutGroup>()) {
+        value = withContext(Dispatchers.IO) { installedAppShortcuts(context) }
+    }
     LazyColumn {
         item(key = "form") { LinkForm(onAdd) }
         if (groups.isNotEmpty()) item(key = "presets") { GroupTitle(stringResource(R.string.preset_section)) }
         groups.forEach { group ->
-            item(key = group.appLabel) {
-                Text(
-                    group.appLabel,
-                    Modifier.padding(start = 16.dp, top = 8.dp),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            item(key = group.appLabel) { AppName(group.appLabel) }
             items(group.presets, key = { it.uri }) { preset ->
                 val item = LinkItem(stringResource(preset.labelRes), preset.uri)
                 PickerRow(item, item.label, item in selected) { onToggle(item) }
             }
         }
+        if (shortcutGroups.isNotEmpty()) {
+            item(key = "shortcuts") {
+                Column {
+                    GroupTitle(stringResource(R.string.app_shortcut_section))
+                    Text(
+                        stringResource(R.string.app_shortcut_hint),
+                        Modifier.padding(horizontal = 16.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        shortcutGroups.forEach { group ->
+            item(key = "shortcuts:${group.packageName}") { AppName(group.appLabel) }
+            items(group.shortcuts, key = { "shortcut:${it.uri}" }) { item ->
+                PickerRow(item, item.label, item in selected) { onToggle(item) }
+            }
+        }
     }
+}
+
+@Composable
+private fun AppName(text: String) {
+    Text(
+        text,
+        Modifier.padding(start = 16.dp, top = 8.dp),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
