@@ -49,11 +49,6 @@ android {
     buildFeatures {
         compose = true
     }
-
-    // The app is Chinese only; this drops the other ~80 languages the Compose libraries bring.
-    androidResources {
-        localeFilters += listOf("zh-rCN", "zh-rHK", "zh-rTW")
-    }
 }
 
 kotlin {
