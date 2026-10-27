@@ -19,6 +19,9 @@ import android.view.View
 import android.view.WindowManager
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /** Foreground service that keeps the edge handle or the floating icon on screen and opens the panel from it. */
@@ -30,6 +33,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
     private var handle: EdgeHandleView? = null
     private var ball: FloatingBall? = null
     private var panel: PanelWindow? = null
+    private val scope = MainScope()
 
     /** Where the edge handle is being dragged to: its side and top, saved when it is let go. */
     private var handleDrag: Pair<Side, Int>? = null
@@ -45,6 +49,8 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
         // foreground service from the background while one of its overlay windows is visible.
         if (Settings.canDrawOverlays(this)) addTrigger()
         prefs.prefs.registerOnSharedPreferenceChangeListener(this)
+        scope.launch { ActionAccessibilityService.foregroundPackage.collect { updateTriggerVisibility() } }
+        scope.launch { ActionAccessibilityService.keyboardTop.collect { updateKeyboard() } }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -56,7 +62,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             stopSelf()
             return START_NOT_STICKY
         }
-        if (intent?.action == ACTION_OPEN_PANEL) openPanel(ball?.side ?: prefs.side)
+        if (intent?.action == ACTION_OPEN_PANEL) openPanel(ball?.side ?: prefs.side, intent.getIntExtra(EXTRA_PAGE, 0))
         return START_STICKY
     }
 
@@ -74,6 +80,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
     }
 
     override fun onDestroy() {
+        scope.cancel()
         prefs.prefs.unregisterOnSharedPreferenceChangeListener(this)
         panel?.remove()
         removeTrigger()
@@ -85,6 +92,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
         super.onConfigurationChanged(newConfig)
         updateHandle()
         ball?.update()
+        updateTriggerVisibility()
     }
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
@@ -102,6 +110,8 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
         } else {
             updateHandle()
             ball?.update()
+            updateKeyboard()
+            updateTriggerVisibility()
         }
     }
 
@@ -110,6 +120,24 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             TriggerMode.EDGE -> addHandle()
             TriggerMode.BALL -> ball = FloatingBall(this, windowManager, prefs, onGesture = ::onBallGesture).also { it.add() }
         }
+        updateKeyboard()
+        updateTriggerVisibility()
+    }
+
+    private fun updateKeyboard() {
+        ball?.keyboardTop = ActionAccessibilityService.keyboardTop.value.takeIf { prefs.avoidKeyboard }
+    }
+
+    /** Shows the trigger unless the panel is open, the app list rules out the app in front, or it is landscape. */
+    private fun updateTriggerVisibility() {
+        val front = ActionAccessibilityService.foregroundPackage.value
+        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        // The handle stays while a finger drags the panel out from it: hiding it would cancel the touch.
+        val visible = panel?.held != false &&
+            triggerAllowedIn(front, prefs.appListMode, prefs.listedApps, packageName) &&
+            !(landscape && prefs.hideInLandscape)
+        handle?.visibility = if (visible) View.VISIBLE else View.GONE
+        ball?.visible = visible
     }
 
     /** A tap or long press on the floating icon: null opens the panel, anything else runs that action. */
@@ -125,7 +153,17 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
     }
 
     private fun addHandle() {
-        val view = EdgeHandleView(this, onOpen = { openPanel(prefs.side) }, onMove = ::moveHandle, onMoveEnd = ::dropHandle)
+        val view = EdgeHandleView(
+            this,
+            onOpen = { rawX -> openPanel(prefs.side, heldAt = rawX.takeIf { prefs.followFinger }) },
+            onDrag = { rawX -> panel?.drag(rawX) },
+            onRelease = { velocityX ->
+                panel?.release(velocityX)
+                updateTriggerVisibility()
+            },
+            onMove = ::moveHandle,
+            onMoveEnd = ::dropHandle,
+        )
         handle = view
         applyHandleStyle(view)
         windowManager.addView(view, handleLayoutParams())
@@ -182,15 +220,18 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
         }
     }
 
-    private fun openPanel(side: Side) {
+    /** Opens the panel on [page]; with [heldAt] it follows a finger at that screen x instead of sliding out. */
+    private fun openPanel(side: Side, page: Int = 0, heldAt: Float? = null) {
         if (panel != null || (handle == null && ball == null)) return
-        handle?.visibility = View.GONE
-        ball?.visible = false
         panel = PanelWindow(
             context = this,
             windowManager = windowManager,
             side = side,
+            initialPage = page,
             widthFraction = prefs.panelWidthPercent / 100f,
+            scrimAlpha = prefs.scrimPercent / 100f,
+            blurBehind = prefs.panelBlur,
+            seeThroughOnBrightness = prefs.brightnessSeeThrough,
             store = ConfigStore.get(this),
             launcher = launcher,
             onOpenSettings = {
@@ -198,10 +239,10 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             },
             onClosed = {
                 panel = null
-                handle?.visibility = View.VISIBLE
-                ball?.visible = true
+                updateTriggerVisibility()
             },
-        ).also { it.show() }
+        ).also { it.show(heldAt) }
+        updateTriggerVisibility()
     }
 
     private fun buildNotification(): Notification {
@@ -229,6 +270,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
         private const val CHANNEL_ID = "service"
         private const val NOTIFICATION_ID = 1
         private const val ACTION_OPEN_PANEL = "io.github.alstarknight.slidex.OPEN_PANEL"
+        private const val EXTRA_PAGE = "page"
 
         fun start(context: Context) {
             val intent = Intent(context, PanelService::class.java)
@@ -241,6 +283,17 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             } catch (e: IllegalStateException) {
                 // Android can refuse to start services from the background; opening the app starts it again.
                 Log.w(TAG, "Cannot start the service", e)
+            }
+        }
+
+        /** Opens the panel on [page], e.g. to show a card that was just added outside it. */
+        fun openPanel(context: Context, page: Int) {
+            if (!Prefs(context).serviceEnabled) return
+            val intent = Intent(context, PanelService::class.java).setAction(ACTION_OPEN_PANEL).putExtra(EXTRA_PAGE, page)
+            try {
+                context.startService(intent)
+            } catch (e: IllegalStateException) {
+                Log.w(TAG, "Cannot open the panel", e)
             }
         }
 

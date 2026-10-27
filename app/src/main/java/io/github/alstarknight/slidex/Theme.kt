@@ -8,6 +8,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
@@ -32,27 +33,28 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/** Look presets, after the interface styles of Minipad Next. */
-enum class ThemePreset(@StringRes val labelRes: Int, val cardRadius: Dp) {
-    /** Blue-purple gradients; "dreamy" when light, a starry night when dark. */
-    STARRY(R.string.theme_starry, 22.dp),
+@get:StringRes
+val ThemePreset.labelRes: Int
+    get() = when (this) {
+        ThemePreset.STARRY -> R.string.theme_starry
+        ThemePreset.MATERIAL -> R.string.theme_material
+        ThemePreset.PAPER -> R.string.theme_paper
+        ThemePreset.CLASSIC -> R.string.theme_classic
+    }
 
-    /** Material You: wallpaper colors on Android 12+, the Material baseline before that. */
-    MATERIAL(R.string.theme_material, 24.dp),
-
-    /** Quiet paper look with thin borders and one blue accent. */
-    PAPER(R.string.theme_paper, 12.dp),
-
-    /** Warm cream and orange. */
-    CLASSIC(R.string.theme_classic, 10.dp),
-}
-
-enum class DarkMode { SYSTEM, LIGHT, DARK }
+private val ThemePreset.cardRadius: Dp
+    get() = when (this) {
+        ThemePreset.STARRY -> 22.dp
+        ThemePreset.MATERIAL -> 24.dp
+        ThemePreset.PAPER -> 12.dp
+        ThemePreset.CLASSIC -> 10.dp
+    }
 
 /** What a preset adds on top of the Material color scheme and shapes. */
 @Immutable
 data class ThemeExtras(
     val dark: Boolean,
+    val preset: ThemePreset,
     /** Gradient for the app title, or null for the plain text color. */
     val titleBrush: Brush?,
     /** Whether to sprinkle stars behind the panel header. */
@@ -60,7 +62,9 @@ data class ThemeExtras(
     val cardBorder: BorderStroke?,
 )
 
-val LocalThemeExtras = staticCompositionLocalOf { ThemeExtras(dark = false, titleBrush = null, stars = false, cardBorder = null) }
+val LocalThemeExtras = staticCompositionLocalOf {
+    ThemeExtras(dark = false, preset = ThemePreset.STARRY, titleBrush = null, stars = false, cardBorder = null)
+}
 
 @Composable
 fun AppTheme(content: @Composable () -> Unit) {
@@ -76,14 +80,17 @@ fun AppTheme(content: @Composable () -> Unit) {
         prefs.prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
-    val dark = when (mode) {
-        DarkMode.SYSTEM -> isSystemInDarkTheme()
-        DarkMode.LIGHT -> false
-        DarkMode.DARK -> true
-    }
-    val colors = colorScheme(context, preset, dark)
+    PresetTheme(preset, mode.isDark(), content)
+}
+
+/** The Material theme and extras of one preset; pages with a look of their own use it too. */
+@Composable
+fun PresetTheme(preset: ThemePreset, dark: Boolean, content: @Composable () -> Unit) {
+    val context = LocalContext.current
+    val colors = remember(preset, dark) { colorScheme(context, preset, dark) }
     val extras = ThemeExtras(
         dark = dark,
+        preset = preset,
         titleBrush = if (preset == ThemePreset.STARRY) starryGradient(dark) else null,
         stars = preset == ThemePreset.STARRY && dark,
         cardBorder = if (preset == ThemePreset.PAPER) BorderStroke(1.dp, colors.outlineVariant) else null,
@@ -91,6 +98,24 @@ fun AppTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = colors, shapes = Shapes(medium = RoundedCornerShape(preset.cardRadius))) {
         CompositionLocalProvider(LocalThemeExtras provides extras, content = content)
     }
+}
+
+/**
+ * A page's own look over [base], the look chosen in the settings. Text and icons outside a card take the page's
+ * text color, since the page may be dark while the settings are light or the other way round.
+ */
+@Composable
+fun PageTheme(style: PageStyle, base: ThemeExtras, content: @Composable () -> Unit) {
+    PresetTheme(style.preset ?: base.preset, style.darkMode?.isDark() ?: base.dark) {
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface, content = content)
+    }
+}
+
+@Composable
+private fun DarkMode.isDark(): Boolean = when (this) {
+    DarkMode.SYSTEM -> isSystemInDarkTheme()
+    DarkMode.LIGHT -> false
+    DarkMode.DARK -> true
 }
 
 /** A small sample of the preset's accent, for the theme picker. */

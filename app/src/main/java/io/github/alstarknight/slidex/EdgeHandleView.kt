@@ -8,18 +8,23 @@ import android.graphics.Rect
 import android.os.Build
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
+import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
 import kotlin.math.hypot
 
 /**
- * Thin touch strip on the screen edge. A swipe from it into the screen opens the panel; after a long press it
- * follows the finger instead ([onMove] with screen coordinates), and [onMoveEnd] fires when it is let go.
+ * Thin touch strip on the screen edge. A swipe from it into the screen opens the panel ([onOpen] with the finger's
+ * screen x); the rest of the swipe goes to [onDrag], and [onRelease] gets its sideways speed when it is let go.
+ * After a long press the strip follows the finger instead ([onMove] with screen coordinates), and [onMoveEnd] fires
+ * when it is let go.
  */
 @SuppressLint("ViewConstructor")
 class EdgeHandleView(
     context: Context,
-    private val onOpen: () -> Unit,
+    private val onOpen: (rawX: Float) -> Unit,
+    private val onDrag: (rawX: Float) -> Unit,
+    private val onRelease: (velocityX: Float) -> Unit,
     private val onMove: (rawX: Float, rawY: Float) -> Unit,
     private val onMoveEnd: () -> Unit,
 ) : View(context) {
@@ -47,6 +52,7 @@ class EdgeHandleView(
     private var downY = 0f
     private var opened = false
     private var moving = false
+    private var velocityTracker: VelocityTracker? = null
     private val startMoving = Runnable {
         moving = true
         performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
@@ -55,6 +61,11 @@ class EdgeHandleView(
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            velocityTracker?.recycle()
+            velocityTracker = VelocityTracker.obtain()
+        }
+        velocityTracker?.addMovement(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downX = event.rawX
@@ -70,9 +81,11 @@ class EdgeHandleView(
                     onMove(event.rawX, event.rawY)
                 } else {
                     if (hypot(dx, dy) > touchSlop) removeCallbacks(startMoving)
-                    if (!opened && isOpenSwipe(side, dx, dy, openThresholdPx)) {
+                    if (opened) {
+                        onDrag(event.rawX)
+                    } else if (isOpenSwipe(side, dx, dy, openThresholdPx)) {
                         opened = true
-                        onOpen()
+                        onOpen(event.rawX)
                     }
                 }
             }
@@ -83,6 +96,13 @@ class EdgeHandleView(
                     invalidate()
                     onMoveEnd()
                 }
+                val tracker = velocityTracker
+                velocityTracker = null
+                if (opened && tracker != null) {
+                    tracker.computeCurrentVelocity(1000)
+                    onRelease(if (event.actionMasked == MotionEvent.ACTION_UP) tracker.xVelocity else 0f)
+                }
+                tracker?.recycle()
             }
         }
         return true

@@ -143,9 +143,12 @@ private fun BrightnessSlider(onClose: () -> Unit) {
     var value by remember {
         mutableFloatStateOf(Settings.System.getInt(resolver, Settings.System.SCREEN_BRIGHTNESS, max / 2).toFloat())
     }
+    val seeThrough = LocalPanelSeeThrough.current
+    DisposableEffect(seeThrough) { onDispose { seeThrough(false) } }
     Slider(
         value = value,
         onValueChange = {
+            seeThrough(true)
             value = it
             try {
                 Settings.System.putInt(
@@ -159,6 +162,7 @@ private fun BrightnessSlider(onClose: () -> Unit) {
             }
         },
         valueRange = 1f..max.toFloat(),
+        onValueChangeFinished = { seeThrough(false) },
     )
 }
 

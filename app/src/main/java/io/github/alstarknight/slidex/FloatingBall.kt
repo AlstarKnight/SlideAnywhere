@@ -55,6 +55,14 @@ class FloatingBall(
             view.visibility = if (value) View.VISIBLE else View.GONE
         }
 
+    /** Top edge of the on-screen keyboard, or null when none is shown; the icon moves up out of its way. */
+    var keyboardTop: Int? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            update()
+        }
+
     /** The edge the icon is nearer to; the panel slides in from there. */
     val side: Side
         get() = nearestSide(params.x + params.width / 2f, windowManager.screenSize().x)
@@ -81,7 +89,8 @@ class FloatingBall(
         params.width = size
         params.height = size
         params.x = centeredOffset(screen.x, size, prefs.ballX)
-        params.y = centeredOffset(screen.y, size, prefs.ballY)
+        val top = centeredOffset(screen.y, size, prefs.ballY)
+        params.y = aboveKeyboard(top, size, keyboardTop, (KEYBOARD_GAP_DP * density).roundToInt())
         view.shape = prefs.ballShape
         view.alpha = prefs.ballOpacityPercent / 100f
     }
@@ -107,6 +116,8 @@ class FloatingBall(
         )
     }
 }
+
+private const val KEYBOARD_GAP_DP = 12
 
 /** Size of the whole screen in pixels, system bars included. */
 fun WindowManager.screenSize(): Point =

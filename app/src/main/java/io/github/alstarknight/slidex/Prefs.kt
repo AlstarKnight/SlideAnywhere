@@ -38,9 +38,50 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_SHOW_HANDLE, true)
         set(value) = prefs.edit { putBoolean(KEY_SHOW_HANDLE, value) }
 
+    /** Whether a swipe from the edge handle pulls the panel out under the finger, rather than opening it at once. */
+    var followFinger: Boolean
+        get() = prefs.getBoolean(KEY_FOLLOW_FINGER, true)
+        set(value) = prefs.edit { putBoolean(KEY_FOLLOW_FINGER, value) }
+
     var panelWidthPercent: Int
         get() = prefs.getInt(KEY_PANEL_WIDTH, 85)
         set(value) = prefs.edit { putInt(KEY_PANEL_WIDTH, value) }
+
+    /**
+     * Packages the trigger hides in, or with a whitelist the only ones it shows in. Telling which app is in front
+     * needs the accessibility service. Kept under the old blacklist key so an existing list carries over.
+     */
+    var listedApps: Set<String>
+        get() = prefs.getStringSet(KEY_LISTED_APPS, null).orEmpty().toSet()
+        set(value) = prefs.edit { putStringSet(KEY_LISTED_APPS, value) }
+
+    var appListMode: AppListMode
+        get() = enumPref(KEY_APP_LIST_MODE, AppListMode.BLACKLIST)
+        set(value) = prefs.edit { putString(KEY_APP_LIST_MODE, value.name) }
+
+    /** Move the floating icon above the keyboard while one is shown; needs the accessibility service. */
+    var avoidKeyboard: Boolean
+        get() = prefs.getBoolean(KEY_AVOID_KEYBOARD, true)
+        set(value) = prefs.edit { putBoolean(KEY_AVOID_KEYBOARD, value) }
+
+    var hideInLandscape: Boolean
+        get() = prefs.getBoolean(KEY_HIDE_IN_LANDSCAPE, false)
+        set(value) = prefs.edit { putBoolean(KEY_HIDE_IN_LANDSCAPE, value) }
+
+    /** Blur what is behind the panel (Android 12+). */
+    var panelBlur: Boolean
+        get() = prefs.getBoolean(KEY_PANEL_BLUR, false)
+        set(value) = prefs.edit { putBoolean(KEY_PANEL_BLUR, value) }
+
+    /** How much the screen behind the open panel is darkened, in percent. */
+    var scrimPercent: Int
+        get() = prefs.getInt(KEY_SCRIM, 35)
+        set(value) = prefs.edit { putInt(KEY_SCRIM, value) }
+
+    /** Fade the panel out while the brightness slider is dragged, to show the new brightness behind it. */
+    var brightnessSeeThrough: Boolean
+        get() = prefs.getBoolean(KEY_BRIGHTNESS_SEE_THROUGH, true)
+        set(value) = prefs.edit { putBoolean(KEY_BRIGHTNESS_SEE_THROUGH, value) }
 
     var triggerMode: TriggerMode
         get() = enumPref(KEY_TRIGGER_MODE, TriggerMode.EDGE)
@@ -87,6 +128,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_SHOW_NOTIFICATION, true)
         set(value) = prefs.edit { putBoolean(KEY_SHOW_NOTIFICATION, value) }
 
+    /** Package of the chosen icon pack, or null for the apps' own icons. */
+    var iconPack: String?
+        get() = prefs.getString(KEY_ICON_PACK, null)
+        set(value) = prefs.edit { putString(KEY_ICON_PACK, value) }
+
     var themePreset: ThemePreset
         get() = enumPref(KEY_THEME_PRESET, ThemePreset.STARRY)
         set(value) = prefs.edit { putString(KEY_THEME_PRESET, value.name) }
@@ -112,7 +158,15 @@ class Prefs(context: Context) {
         const val KEY_HANDLE_HEIGHT = "handle_height"
         const val KEY_HANDLE_WIDTH = "handle_width"
         const val KEY_SHOW_HANDLE = "show_handle"
+        const val KEY_FOLLOW_FINGER = "follow_finger"
         const val KEY_PANEL_WIDTH = "panel_width"
+        const val KEY_PANEL_BLUR = "panel_blur"
+        const val KEY_SCRIM = "scrim"
+        const val KEY_BRIGHTNESS_SEE_THROUGH = "brightness_see_through"
+        const val KEY_LISTED_APPS = "hidden_apps"
+        const val KEY_APP_LIST_MODE = "app_list_mode"
+        const val KEY_AVOID_KEYBOARD = "avoid_keyboard"
+        const val KEY_HIDE_IN_LANDSCAPE = "hide_in_landscape"
         const val KEY_TRIGGER_MODE = "trigger_mode"
         const val KEY_BALL_SHAPE = "ball_shape"
         const val KEY_BALL_SIZE = "ball_size"
@@ -122,6 +176,7 @@ class Prefs(context: Context) {
         const val KEY_BALL_TAP = "ball_tap"
         const val KEY_BALL_LONG_PRESS = "ball_long_press"
         const val KEY_SHOW_NOTIFICATION = "show_notification"
+        const val KEY_ICON_PACK = "icon_pack"
         const val KEY_THEME_PRESET = "theme_preset"
         const val KEY_DARK_MODE = "dark_mode"
     }

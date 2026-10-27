@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:icon="@drawable/ic_shortcut_panel"
+        android:shortcutId="open_panel"
+        android:shortcutLongLabel="@string/shortcut_open_panel"
+        android:shortcutShortLabel="@string/shortcut_open_panel_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="io.github.alstarknight.slidex.OpenPanelActivity"
+            android:targetPackage="io.github.alstarknight.slidex" />
+    </shortcut>
+</shortcuts>

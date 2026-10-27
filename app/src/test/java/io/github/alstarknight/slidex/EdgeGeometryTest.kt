@@ -56,6 +56,23 @@ class EdgeGeometryTest {
     }
 
     @Test
+    fun panelFollowsTheFingerFromEitherEdge() {
+        assertEquals(0.5f, panelFraction(Side.LEFT, x = 400f, screenWidth = 1000, panelWidth = 800f), 0.0001f)
+        assertEquals(0.25f, panelFraction(Side.RIGHT, x = 800f, screenWidth = 1000, panelWidth = 800f), 0.0001f)
+        assertEquals(1f, panelFraction(Side.LEFT, x = 950f, screenWidth = 1000, panelWidth = 800f), 0.0001f)
+        assertEquals(0f, panelFraction(Side.RIGHT, x = 1010f, screenWidth = 1000, panelWidth = 800f), 0.0001f)
+        assertEquals(1f, panelFraction(Side.LEFT, x = 0f, screenWidth = 1000, panelWidth = 0f), 0.0001f)
+    }
+
+    @Test
+    fun aFlickDecidesOtherwiseThePanelOpensWhenHalfOut() {
+        assertTrue(settlesOpen(fraction = 0.2f, velocity = 500f, flingVelocity = 400f))
+        assertFalse(settlesOpen(fraction = 0.9f, velocity = -500f, flingVelocity = 400f))
+        assertTrue(settlesOpen(fraction = 0.5f, velocity = -100f, flingVelocity = 400f))
+        assertFalse(settlesOpen(fraction = 0.4f, velocity = 100f, flingVelocity = 400f))
+    }
+
+    @Test
     fun nearestSideSplitsTheScreenInHalf() {
         assertEquals(Side.LEFT, nearestSide(x = 400f, screenWidth = 1000))
         assertEquals(Side.RIGHT, nearestSide(x = 600f, screenWidth = 1000))
@@ -67,5 +84,13 @@ class EdgeGeometryTest {
         assertEquals(0.5f, centerFraction(length = 2000, size = 100, offset = 950), 0.0001f)
         assertEquals(0, centeredOffset(length = 2000, size = 100, fraction = 0f))
         assertEquals(1900, centeredOffset(length = 2000, size = 100, fraction = 1f))
+    }
+
+    @Test
+    fun iconMovesAboveTheKeyboardOnlyWhenItWouldOverlap() {
+        assertEquals(1000, aboveKeyboard(top = 1000, size = 100, keyboardTop = null, gap = 20))
+        assertEquals(500, aboveKeyboard(top = 500, size = 100, keyboardTop = 1500, gap = 20))
+        assertEquals(1380, aboveKeyboard(top = 1600, size = 100, keyboardTop = 1500, gap = 20))
+        assertEquals(0, aboveKeyboard(top = 100, size = 100, keyboardTop = 50, gap = 20))
     }
 }
