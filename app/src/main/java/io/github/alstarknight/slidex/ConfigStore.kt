@@ -5,9 +5,11 @@ import android.util.Log
 import androidx.core.util.AtomicFile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -16,15 +18,17 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.util.UUID
 
-/** App-wide holder of the panel config; every change is written to `files/config.json` in the background. */
+/** App-wide holder of the panel config; changes are written to `files/config.json` in the background. */
+@OptIn(FlowPreview::class)
 class ConfigStore private constructor(context: Context) {
     private val file = AtomicFile(File(context.filesDir, "config.json"))
     private val _config = MutableStateFlow(load(context))
     val config: StateFlow<PanelConfig> = _config
 
     init {
+        // Typing in a note or dragging a slider changes the config many times a second; it is written once they pause.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            _config.drop(1).collect { save(it) }
+            _config.drop(1).debounce(SAVE_DELAY_MS).collect { save(it) }
         }
     }
 
@@ -61,6 +65,7 @@ class ConfigStore private constructor(context: Context) {
 
     companion object {
         private const val TAG = "ConfigStore"
+        private const val SAVE_DELAY_MS = 500L
 
         @Volatile
         private var instance: ConfigStore? = null

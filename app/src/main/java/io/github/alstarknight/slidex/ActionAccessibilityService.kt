@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Rect
 import android.provider.Settings
@@ -17,29 +18,58 @@ import kotlinx.coroutines.flow.StateFlow
  * front so the trigger can follow the app list, and where the keyboard is so the floating icon can move out of its
  * way. It looks only at window types and positions, never at what windows show.
  */
-class ActionAccessibilityService : AccessibilityService() {
+class ActionAccessibilityService : AccessibilityService(), SharedPreferences.OnSharedPreferenceChangeListener {
 
     /** Whether a window class is an activity, by "package/class"; dialogs and keyboards are not. */
     private val activityChecks = HashMap<String, Boolean>()
 
+    private val prefs by lazy { Prefs(this) }
+    private var trackForeground = false
+    private var trackKeyboard = false
+
     override fun onServiceConnected() {
         instance = this
+        prefs.prefs.registerOnSharedPreferenceChangeListener(this)
+        updateTracking()
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
         instance = null
+        prefs.prefs.unregisterOnSharedPreferenceChangeListener(this)
         foreground.value = null
         keyboard.value = null
         return super.onUnbind(intent)
     }
 
+    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) = updateTracking()
+
+    /**
+     * Asks for window events only while a setting uses them: the app list needs the app in front, the floating
+     * icon's keyboard dodging needs the keyboard. Otherwise the system sends it no events at all.
+     */
+    private fun updateTracking() {
+        trackForeground = prefs.serviceEnabled &&
+            (prefs.appListMode == AppListMode.WHITELIST || prefs.listedApps.isNotEmpty())
+        trackKeyboard = prefs.serviceEnabled && prefs.triggerMode == TriggerMode.BALL && prefs.avoidKeyboard
+        if (!trackForeground) foreground.value = null
+        if (!trackKeyboard) keyboard.value = null
+        var types = 0
+        if (trackForeground || trackKeyboard) types = types or AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+        if (trackKeyboard) types = types or AccessibilityEvent.TYPE_WINDOWS_CHANGED
+        val info = serviceInfo ?: return
+        if (info.eventTypes != types) {
+            info.eventTypes = types
+            serviceInfo = info
+        }
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         when (event?.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                updateForeground(event)
-                updateKeyboard()
+                if (trackForeground) updateForeground(event)
+                if (trackKeyboard) updateKeyboard()
             }
-            AccessibilityEvent.TYPE_WINDOWS_CHANGED -> updateKeyboard()
+            AccessibilityEvent.TYPE_WINDOWS_CHANGED -> if (trackKeyboard) updateKeyboard()
         }
     }
 

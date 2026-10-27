@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Process
 import android.provider.Settings
+import java.text.Collator
 
 /** Recently and frequently used apps, read from the system's usage history. */
 object UsageApps {
@@ -32,13 +33,21 @@ object UsageApps {
         val stats = context.getSystemService(UsageStatsManager::class.java)
             .queryAndAggregateUsageStats(now - HISTORY_MS, now)
         val usage = stats.values.map { AppUsage(it.packageName, it.lastTimeUsed, it.totalTimeInForeground) }
-        val launchable = InstalledApps.load(context).associateBy { it.packageName }
+        val pm = context.packageManager
+        val launchable = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+            .groupBy { it.activityInfo.packageName }
         val notLaunchable = usage.map { it.packageName }.filterNot { it in launchable }
         // The launcher is in the foreground between every two apps, so it would always come first.
         val exclude = notLaunchable.toSet() + setOfNotNull(context.packageName, homePackage(context))
-        return rankUsage(usage, kind, exclude, count).map {
-            val app = launchable.getValue(it)
-            AppItem(app.label, app.packageName, app.activityName)
+        val collator = Collator.getInstance()
+        // Names are read only for the apps shown, which is much quicker than for all; an app with several launcher
+        // entries shows the one last by name.
+        return rankUsage(usage, kind, exclude, count).map { packageName ->
+            val (label, activity) = launchable.getValue(packageName)
+                .map { it.loadLabel(pm).toString() to it.activityInfo }
+                .sortedWith { a, b -> collator.compare(a.first, b.first) }
+                .last()
+            AppItem(label, activity.packageName, activity.name)
         }
     }
 
