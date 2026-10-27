@@ -10,33 +10,10 @@ class LinkPreset(@StringRes val labelRes: Int, val uri: String)
 /** A link into another app, with what search finds it by: the app's name followed by the link's. */
 class AppLink(val item: LinkItem, val search: SearchKey)
 
-/** The links into one app, under the app's name as the system shows it. */
-class AppLinks(val packageName: String, val appLabel: String, val links: List<AppLink>)
-
-/** [AppLinks] for [items], with their search keys. Call off the main thread. */
-fun appLinks(packageName: String, appLabel: String, items: List<LinkItem>) = AppLinks(
-    packageName,
-    appLabel,
-    items.map { AppLink(it, searchKey(appLabel + it.label, packageName, Pinyin::syllable)) },
-)
-
-/**
- * The links listed first: the installed apps' links from [COMMON_PRESETS] in [presets], with Douyin's scanner from
- * its own [shortcuts] since it has no link for other apps, in the order of [COMMON_APPS].
- */
-fun commonLinks(presets: List<AppLinks>, shortcuts: List<AppLinks>): List<AppLinks> {
-    val douyinScanner = shortcuts
-        .filter { it.packageName == DOUYIN }
-        .map { app -> AppLinks(app.packageName, app.appLabel, app.links.filter { "扫" in it.item.label }) }
-        .filter { it.links.isNotEmpty() }
-    return (presets + douyinScanner).sortedBy { COMMON_APPS.indexOf(it.packageName) }
+/** The links into one app, under the app's name as the system shows it. Build off the main thread. */
+class AppLinks(val packageName: String, val appLabel: String, links: List<LinkItem>) {
+    val links = links.map { AppLink(it, searchKey(appLabel + it.label, packageName, Pinyin::syllable)) }
 }
-
-private const val DOUYIN = "com.ss.android.ugc.aweme"
-
-/** The apps with common links, in the order they are listed. */
-private val COMMON_APPS =
-    listOf("com.eg.android.AlipayGphone", "com.tencent.mm", "com.sankuai.meituan", DOUYIN, "com.ss.android.lark")
 
 /** The links from [presets] for the apps that are installed and can still open them. Call off the main thread. */
 fun installedPresets(context: Context, presets: List<Pair<String, List<LinkPreset>>>): List<AppLinks> {
@@ -55,7 +32,7 @@ fun installedPresets(context: Context, presets: List<Pair<String, List<LinkPrese
             null
         } else {
             val links = usable.map { LinkItem(context.getString(it.labelRes), it.uri) }
-            appLinks(packageName, app.loadLabel(pm).toString(), links)
+            AppLinks(packageName, app.loadLabel(pm).toString(), links)
         }
     }
 }

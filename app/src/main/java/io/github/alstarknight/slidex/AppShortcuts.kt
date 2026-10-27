@@ -47,7 +47,7 @@ fun installedAppShortcuts(context: Context): List<AppLinks> {
             if (shortcuts.isEmpty()) {
                 null
             } else {
-                appLinks(packageName, info.loadLabel(pm).toString(), shortcuts)
+                AppLinks(packageName, info.loadLabel(pm).toString(), shortcuts)
             }
         }
         .sortedWith { a, b -> collator.compare(a.appLabel, b.appLabel) }
