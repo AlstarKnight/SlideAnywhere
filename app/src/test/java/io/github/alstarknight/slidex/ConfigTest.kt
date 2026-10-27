@@ -121,6 +121,19 @@ class ConfigTest {
     }
 
     @Test
+    fun rowGapStaysInRange() {
+        fun gapAfter(dp: Int) = (config.setRowGap("g", dp).pages[0].cards[0] as GridCard).rowGapDp
+        assertEquals(DEFAULT_ROW_GAP, (config.pages[0].cards[0] as GridCard).rowGapDp)
+        assertEquals(8, gapAfter(8))
+        assertEquals(ROW_GAP_RANGE.last, gapAfter(99))
+        assertEquals(ROW_GAP_RANGE.first, gapAfter(-4))
+        assertEquals(config.setRowGap("g", 8), parseConfig(config.setRowGap("g", 8).toJson()))
+        assertEquals(config, config.setRowGap("n", 8))
+        val withUsage = config.addCard(1, UsageCard("u", "常用", UsageKind.FREQUENT)).setRowGap("u", 4)
+        assertEquals(4, (withUsage.pages[1].cards[0] as UsageCard).rowGapDp)
+    }
+
+    @Test
     fun systemCardsRoundTripAndRename() {
         val battery = SystemCard("s", "电量", SystemKind.BATTERY)
         val withSystem = config.addCard(1, battery)

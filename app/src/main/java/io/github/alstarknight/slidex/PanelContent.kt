@@ -448,6 +448,7 @@ private fun PanelCard(
                         onMove = { from, to -> store.update { it.moveItem(card.id, from, to) } },
                         onEdit = onRenameItem,
                         showLabels = card.showLabels,
+                        rowGap = card.rowGapDp.dp,
                     )
                 }
                 is NoteCard -> NoteField(card, store)
@@ -504,6 +505,7 @@ private fun UsageCardContent(
         onRemove = {},
         onAdd = {},
         showLabels = card.showLabels,
+        rowGap = card.rowGapDp.dp,
     )
 }
 
@@ -664,6 +666,7 @@ private fun ItemGrid(
     /** Called with an icon's index when it is tapped in edit mode. */
     onEdit: (Int) -> Unit = {},
     showLabels: Boolean = true,
+    rowGap: Dp = DEFAULT_ROW_GAP.dp,
 ) {
     // In edit mode an icon can be long-pressed and dragged: dragFrom is its index, dragOffset how far it has moved.
     var dragFrom by remember { mutableStateOf<Int?>(null) }
@@ -702,6 +705,8 @@ private fun ItemGrid(
         columns == 5 -> 40.dp
         else -> 44.dp
     }
+    // Each cell takes half the gap above and below its icon, so rows stay equally tall for dragging.
+    val cellPadding = rowGap / 2
     val dragModifier = if (!editing) Modifier else Modifier.pointerInput(columns) {
         detectDragGesturesAfterLongPress(
             onDragStart = { position ->
@@ -740,7 +745,7 @@ private fun ItemGrid(
                 row.forEachIndexed { columnIndex, index ->
                     val cellModifier = Modifier.weight(1f)
                     if (index < 0) {
-                        AddCell(iconSize, onAdd, cellModifier)
+                        AddCell(iconSize, cellPadding, onAdd, cellModifier)
                     } else {
                         val item = items[index]
                         val action = (item as? ActionItem)?.action
@@ -751,6 +756,7 @@ private fun ItemGrid(
                             switchedOn = action?.takeIf { it in SWITCH_ACTIONS }?.let { it in switches },
                             editing = editing,
                             showLabel = showLabels,
+                            verticalPadding = cellPadding,
                             onClick = {
                                 when {
                                     !editing -> onLaunch(item)
@@ -789,6 +795,7 @@ private fun ItemCell(
     switchedOn: Boolean?,
     editing: Boolean,
     showLabel: Boolean,
+    verticalPadding: Dp,
     onClick: () -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier,
@@ -797,7 +804,7 @@ private fun ItemCell(
         modifier
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+            .padding(vertical = verticalPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box {
@@ -835,12 +842,12 @@ private fun ItemCell(
 }
 
 @Composable
-private fun AddCell(iconSize: Dp, onClick: () -> Unit, modifier: Modifier) {
+private fun AddCell(iconSize: Dp, verticalPadding: Dp, onClick: () -> Unit, modifier: Modifier) {
     Column(
         modifier
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+            .padding(vertical = verticalPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(

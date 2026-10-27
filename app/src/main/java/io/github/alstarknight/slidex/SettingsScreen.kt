@@ -618,7 +618,10 @@ private fun BackgroundPicture(name: String?, onChange: (String?) -> Unit) {
     }
 }
 
-/** How one card shows: its title, the names under its icons, its height, and a text card's text style. */
+/**
+ * How one card shows: its title, the names under its icons and the space between their rows, its height, and a text
+ * card's text style.
+ */
 @Composable
 private fun CardStyleSection(card: Card, store: ConfigStore) {
     Section {
@@ -637,6 +640,16 @@ private fun CardStyleSection(card: Card, store: ConfigStore) {
         if (showLabels != null) {
             SwitchRow(stringResource(R.string.card_show_labels), showLabels) { show ->
                 store.update { it.setShowLabels(card.id, show) }
+            }
+        }
+        val rowGap = when (card) {
+            is GridCard -> card.rowGapDp
+            is UsageCard -> card.rowGapDp
+            else -> null
+        }
+        if (rowGap != null) {
+            SliderRow(stringResource(R.string.card_row_gap), "dp", rowGap, ROW_GAP_RANGE, step = ROW_GAP_STEP) { dp ->
+                store.update { it.setRowGap(card.id, dp) }
             }
         }
         val height = when (card) {
@@ -662,6 +675,7 @@ private fun CardStyleSection(card: Card, store: ConfigStore) {
 }
 
 private const val CARD_HEIGHT_STEP = 8
+private const val ROW_GAP_STEP = 4
 
 @Composable
 private fun TextStyleRows(card: TextCard, store: ConfigStore) {

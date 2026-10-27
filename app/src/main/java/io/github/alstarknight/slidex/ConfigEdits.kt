@@ -60,6 +60,15 @@ fun PanelConfig.setShowLabels(cardId: String, show: Boolean): PanelConfig = mapC
     }
 }
 
+/** Sets the space between rows of icons of an icon or usage card. */
+fun PanelConfig.setRowGap(cardId: String, rowGapDp: Int): PanelConfig = mapCard(cardId) {
+    when (it) {
+        is GridCard -> it.copy(rowGapDp = rowGapDp.coerceIn(ROW_GAP_RANGE))
+        is UsageCard -> it.copy(rowGapDp = rowGapDp.coerceIn(ROW_GAP_RANGE))
+        else -> it
+    }
+}
+
 /** Sets the height of a text, note or widget card; other cards always fit their content. */
 fun PanelConfig.setCardHeight(cardId: String, heightDp: Int): PanelConfig = mapCard(cardId) {
     when (it) {
