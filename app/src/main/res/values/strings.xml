@@ -202,6 +202,7 @@
     <string name="add_tab_link">链接</string>
     <string name="add_selected">添加 %1$d 项</string>
     <string name="preset_section">常用入口</string>
+    <string name="preset_more_section">更多入口</string>
     <string name="app_shortcut_section">应用快捷方式</string>
     <string name="app_shortcut_hint">长按应用图标出现的快捷方式中，应用写在安装包里的那些。应用运行后才加上的快捷方式只有桌面能打开，所以不会出现在这里。</string>
     <string name="preset_scan">扫一扫</string>
@@ -213,6 +214,7 @@
     <string name="preset_post_weibo">发微博</string>
     <string name="search_apps">搜索应用（支持拼音、首字母）</string>
     <string name="search_widgets">搜索小部件或应用（支持拼音、首字母）</string>
+    <string name="search_links">搜索入口或应用（支持拼音、首字母）</string>
     <string name="link_label">名称</string>
     <string name="link_uri">网址或 URI</string>
     <string name="link_uri_hint">支持 https://、tel:（拨号）、应用 Scheme（如 alipays://）和 intent: URI</string>

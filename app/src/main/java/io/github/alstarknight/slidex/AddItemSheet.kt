@@ -1,6 +1,7 @@
 package io.github.alstarknight.slidex
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -158,46 +160,80 @@ private fun PickerRow(item: Item, label: String, checked: Boolean, onClick: () -
 }
 
 /**
- * A form for a link of your own, then ready-made links into the installed apps that have them, then the shortcuts
- * the apps declare for a long press on their icons.
+ * A search box, a form for a link of your own, then ready-made links into the installed apps that have them, the
+ * common ones first, and the shortcuts the apps declare for a long press on their icons.
  */
 @Composable
 private fun LinkPicker(selected: List<Item>, onToggle: (Item) -> Unit, onAdd: (LinkItem) -> Unit) {
     val context = LocalContext.current
-    val groups by produceState(emptyList<PresetGroup>()) {
-        value = withContext(Dispatchers.IO) { installedPresets(context) }
+    val presets by produceState(emptyList<AppLinks>() to emptyList<AppLinks>()) {
+        value = withContext(Dispatchers.IO) {
+            installedPresets(context, COMMON_PRESETS) to installedPresets(context, MORE_PRESETS)
+        }
     }
-    val shortcutGroups by produceState(emptyList<ShortcutGroup>()) {
+    val shortcuts by produceState(emptyList<AppLinks>()) {
         value = withContext(Dispatchers.IO) { installedAppShortcuts(context) }
     }
+    var query by remember { mutableStateOf("") }
+    OutlinedTextField(
+        value = query,
+        onValueChange = { query = it },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(12.dp),
+        singleLine = true,
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+        placeholder = { Text(stringResource(R.string.search_links)) },
+    )
     LazyColumn {
-        item(key = "form") { LinkForm(onAdd) }
-        if (groups.isNotEmpty()) item(key = "presets") { GroupTitle(stringResource(R.string.preset_section)) }
-        groups.forEach { group ->
-            item(key = group.appLabel) { AppName(group.appLabel) }
-            items(group.presets, key = { it.uri }) { preset ->
-                val item = LinkItem(stringResource(preset.labelRes), preset.uri)
-                PickerRow(item, item.label, item in selected) { onToggle(item) }
+        // The form is for links of your own, so it makes way while the listed ones are searched.
+        if (query.isBlank()) item(key = "form") { LinkForm(onAdd) }
+        linkSection("common", R.string.preset_section, null, presets.first, query, selected, onToggle)
+        linkSection("more", R.string.preset_more_section, null, presets.second, query, selected, onToggle)
+        linkSection(
+            key = "shortcuts",
+            title = R.string.app_shortcut_section,
+            hint = R.string.app_shortcut_hint,
+            apps = shortcuts,
+            query = query,
+            selected = selected,
+            onToggle = onToggle,
+        )
+    }
+}
+
+/** A titled list of apps' links, leaving out the ones [query] does not find, and the title when none are left. */
+private fun LazyListScope.linkSection(
+    key: String,
+    @StringRes title: Int,
+    @StringRes hint: Int?,
+    apps: List<AppLinks>,
+    query: String,
+    selected: List<Item>,
+    onToggle: (Item) -> Unit,
+) {
+    val found = apps.mapNotNull { app ->
+        val links = app.links.filter { searchScore(query, it.search) != null }
+        if (links.isEmpty()) null else app to links
+    }
+    if (found.isEmpty()) return
+    item(key = key) {
+        Column {
+            GroupTitle(stringResource(title))
+            if (hint != null) {
+                Text(
+                    stringResource(hint),
+                    Modifier.padding(horizontal = 16.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
-        if (shortcutGroups.isNotEmpty()) {
-            item(key = "shortcuts") {
-                Column {
-                    GroupTitle(stringResource(R.string.app_shortcut_section))
-                    Text(
-                        stringResource(R.string.app_shortcut_hint),
-                        Modifier.padding(horizontal = 16.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-        shortcutGroups.forEach { group ->
-            item(key = "shortcuts:${group.packageName}") { AppName(group.appLabel) }
-            items(group.shortcuts, key = { "shortcut:${it.uri}" }) { item ->
-                PickerRow(item, item.label, item in selected) { onToggle(item) }
-            }
+    }
+    found.forEach { (app, links) ->
+        item(key = "$key:${app.packageName}") { AppName(app.appLabel) }
+        items(links, key = { "$key:${it.item.uri}" }) { link ->
+            PickerRow(link.item, link.item.label, link.item in selected) { onToggle(link.item) }
         }
     }
 }

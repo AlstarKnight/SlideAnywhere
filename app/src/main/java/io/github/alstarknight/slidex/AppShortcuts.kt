@@ -12,15 +12,12 @@ import org.xmlpull.v1.XmlPullParserException
 import java.io.IOException
 import java.text.Collator
 
-/** The shortcuts of one app, as links that open them. */
-class ShortcutGroup(val packageName: String, val appLabel: String, val shortcuts: List<LinkItem>)
-
 /**
  * Shortcuts the installed apps declare in their packages, the fixed part of what a long press on their icons shows,
  * that other apps may open. Shortcuts an app adds while it runs are only given to the home screen app, so they are
  * not here. Call off the main thread.
  */
-fun installedAppShortcuts(context: Context): List<ShortcutGroup> {
+fun installedAppShortcuts(context: Context): List<AppLinks> {
     val pm = context.packageManager
     val collator = Collator.getInstance()
     return pm.queryIntentActivities(
@@ -50,7 +47,7 @@ fun installedAppShortcuts(context: Context): List<ShortcutGroup> {
             if (shortcuts.isEmpty()) {
                 null
             } else {
-                ShortcutGroup(packageName, info.loadLabel(pm).toString(), shortcuts)
+                AppLinks(packageName, info.loadLabel(pm).toString(), shortcuts)
             }
         }
         .sortedWith { a, b -> collator.compare(a.appLabel, b.appLabel) }
