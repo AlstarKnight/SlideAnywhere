@@ -174,6 +174,7 @@ private fun LinkPicker(selected: List<Item>, onToggle: (Item) -> Unit, onAdd: (L
     val shortcuts by produceState(emptyList<AppLinks>()) {
         value = withContext(Dispatchers.IO) { installedAppShortcuts(context) }
     }
+    val common = remember(presets, shortcuts) { commonLinks(presets.first, shortcuts) }
     var query by remember { mutableStateOf("") }
     OutlinedTextField(
         value = query,
@@ -188,7 +189,7 @@ private fun LinkPicker(selected: List<Item>, onToggle: (Item) -> Unit, onAdd: (L
     LazyColumn {
         // The form is for links of your own, so it makes way while the listed ones are searched.
         if (query.isBlank()) item(key = "form") { LinkForm(onAdd) }
-        linkSection("common", R.string.preset_section, null, presets.first, query, selected, onToggle)
+        linkSection("common", R.string.preset_section, null, common, query, selected, onToggle)
         linkSection("more", R.string.preset_more_section, null, presets.second, query, selected, onToggle)
         linkSection(
             key = "shortcuts",
