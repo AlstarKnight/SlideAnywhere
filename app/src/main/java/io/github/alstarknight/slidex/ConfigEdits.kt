@@ -69,6 +69,16 @@ fun PanelConfig.setRowGap(cardId: String, rowGapDp: Int): PanelConfig = mapCard(
     }
 }
 
+/** Sets the space between icons side by side on an icon or usage card; null sizes the icons by their number. */
+fun PanelConfig.setColumnGap(cardId: String, columnGapDp: Int?): PanelConfig = mapCard(cardId) {
+    val gap = columnGapDp?.coerceIn(COLUMN_GAP_RANGE)
+    when (it) {
+        is GridCard -> it.copy(columnGapDp = gap)
+        is UsageCard -> it.copy(columnGapDp = gap)
+        else -> it
+    }
+}
+
 /** Sets the height of a text, note or widget card; other cards always fit their content. */
 fun PanelConfig.setCardHeight(cardId: String, heightDp: Int): PanelConfig = mapCard(cardId) {
     when (it) {

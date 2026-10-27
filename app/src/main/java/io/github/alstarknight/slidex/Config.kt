@@ -82,14 +82,20 @@ data class GridCard(
     override val showTitle: Boolean = true,
     /** Whether the names are shown under the icons. */
     val showLabels: Boolean = true,
-    /** Space between rows of icons in dp; the space beside an icon follows from [columns]. */
+    /** Space between rows of icons in dp. */
     val rowGapDp: Int = DEFAULT_ROW_GAP,
+    /**
+     * Space between icons side by side in dp, the icons growing or shrinking to fill the rest of the width; null
+     * gives them a set size for the number of [columns].
+     */
+    val columnGapDp: Int? = null,
 ) : Card
 
 const val DEFAULT_COLUMNS = 4
 val COLUMN_RANGE = 2..6
 const val DEFAULT_ROW_GAP = 16
 val ROW_GAP_RANGE = 0..40
+val COLUMN_GAP_RANGE = 0..64
 
 @Serializable
 @SerialName("note")
@@ -163,6 +169,7 @@ data class UsageCard(
     override val showTitle: Boolean = true,
     val showLabels: Boolean = true,
     val rowGapDp: Int = DEFAULT_ROW_GAP,
+    val columnGapDp: Int? = null,
 ) : Card
 
 @Serializable

@@ -619,8 +619,8 @@ private fun BackgroundPicture(name: String?, onChange: (String?) -> Unit) {
 }
 
 /**
- * How one card shows: its title, the names under its icons and the space between their rows, its height, and a text
- * card's text style.
+ * How one card shows: its title, the names under its icons and their spacing, its height, and a text card's text
+ * style.
  */
 @Composable
 private fun CardStyleSection(card: Card, store: ConfigStore) {
@@ -642,15 +642,27 @@ private fun CardStyleSection(card: Card, store: ConfigStore) {
                 store.update { it.setShowLabels(card.id, show) }
             }
         }
-        val rowGap = when (card) {
-            is GridCard -> card.rowGapDp
-            is UsageCard -> card.rowGapDp
+        val gaps = when (card) {
+            is GridCard -> card.columnGapDp to card.rowGapDp
+            is UsageCard -> card.columnGapDp to card.rowGapDp
             else -> null
         }
-        if (rowGap != null) {
-            SliderRow(stringResource(R.string.card_row_gap), "dp", rowGap, ROW_GAP_RANGE, step = ROW_GAP_STEP) { dp ->
+        if (gaps != null) {
+            val (columnGap, rowGap) = gaps
+            // The slider's first stop, left of 0, is "auto".
+            val auto = stringResource(R.string.column_gap_auto)
+            SliderRow(
+                stringResource(R.string.card_column_gap),
+                "dp",
+                columnGap ?: AUTO_COLUMN_GAP_STOP,
+                AUTO_COLUMN_GAP_STOP..COLUMN_GAP_RANGE.last,
+                step = GAP_STEP,
+                valueText = { if (it < 0) auto else "${it}dp" },
+            ) { dp -> store.update { it.setColumnGap(card.id, dp.takeIf { gap -> gap >= 0 }) } }
+            SliderRow(stringResource(R.string.card_row_gap), "dp", rowGap, ROW_GAP_RANGE, step = GAP_STEP) { dp ->
                 store.update { it.setRowGap(card.id, dp) }
             }
+            Hint(stringResource(R.string.card_gap_hint))
         }
         val height = when (card) {
             is TextCard -> card.heightDp
@@ -675,7 +687,8 @@ private fun CardStyleSection(card: Card, store: ConfigStore) {
 }
 
 private const val CARD_HEIGHT_STEP = 8
-private const val ROW_GAP_STEP = 4
+private const val GAP_STEP = 4
+private const val AUTO_COLUMN_GAP_STOP = -GAP_STEP
 
 @Composable
 private fun TextStyleRows(card: TextCard, store: ConfigStore) {

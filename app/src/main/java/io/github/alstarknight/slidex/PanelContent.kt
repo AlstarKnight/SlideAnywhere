@@ -93,6 +93,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -449,6 +450,7 @@ private fun PanelCard(
                         onEdit = onRenameItem,
                         showLabels = card.showLabels,
                         rowGap = card.rowGapDp.dp,
+                        columnGap = card.columnGapDp?.dp,
                     )
                 }
                 is NoteCard -> NoteField(card, store)
@@ -506,6 +508,7 @@ private fun UsageCardContent(
         onAdd = {},
         showLabels = card.showLabels,
         rowGap = card.rowGapDp.dp,
+        columnGap = card.columnGapDp?.dp,
     )
 }
 
@@ -667,6 +670,8 @@ private fun ItemGrid(
     onEdit: (Int) -> Unit = {},
     showLabels: Boolean = true,
     rowGap: Dp = DEFAULT_ROW_GAP.dp,
+    /** Space between icons side by side, the icons filling the rest of their cells; null sizes them by [columns]. */
+    columnGap: Dp? = null,
 ) {
     // In edit mode an icon can be long-pressed and dragged: dragFrom is its index, dragOffset how far it has moved.
     var dragFrom by remember { mutableStateOf<Int?>(null) }
@@ -700,11 +705,6 @@ private fun ItemGrid(
     val target = from?.let(::dropIndex)
     val order = if (from != null && target != null) items.indices.toList().move(from, target) else items.indices.toList()
     val cells = order + if (editing) listOf(-1) else emptyList()
-    val iconSize = when {
-        columns >= 6 -> 36.dp
-        columns == 5 -> 40.dp
-        else -> 44.dp
-    }
     // Each cell takes half the gap above and below its icon, so rows stay equally tall for dragging.
     val cellPadding = rowGap / 2
     val dragModifier = if (!editing) Modifier else Modifier.pointerInput(columns) {
@@ -733,60 +733,73 @@ private fun ItemGrid(
             },
         )
     }
-    Column(
-        Modifier
-            .onSizeChanged { gridSize = it }
-            .then(dragModifier),
-    ) {
-        cells.chunked(columns).forEachIndexed { rowIndex, row ->
-            // The dragged icon's row is drawn last so the icon stays above the other rows.
-            val holdsDragged = from != null && from in row
-            Row(Modifier.zIndex(if (holdsDragged) 1f else 0f)) {
-                row.forEachIndexed { columnIndex, index ->
-                    val cellModifier = Modifier.weight(1f)
-                    if (index < 0) {
-                        AddCell(iconSize, cellPadding, onAdd, cellModifier)
-                    } else {
-                        val item = items[index]
-                        val action = (item as? ActionItem)?.action
-                        val dragged = index == from
-                        ItemCell(
-                            item = item,
-                            iconSize = iconSize,
-                            switchedOn = action?.takeIf { it in SWITCH_ACTIONS }?.let { it in switches },
-                            editing = editing,
-                            showLabel = showLabels,
-                            verticalPadding = cellPadding,
-                            onClick = {
-                                when {
-                                    !editing -> onLaunch(item)
-                                    // Letting go of an icon picked up to drag is not a tap on it.
-                                    dragFrom == null -> onEdit(index)
-                                }
-                            },
-                            onRemove = { onRemove(index) },
-                            modifier = if (!dragged) cellModifier else {
-                                // Drawn in the cell it would drop into, shifted back under the finger.
-                                val shift = cellAt(index) + dragOffset - cellAt(rowIndex * columns + columnIndex)
-                                cellModifier
-                                    .zIndex(1f)
-                                    .graphicsLayer {
-                                        translationX = shift.x
-                                        translationY = shift.y
-                                        scaleX = DRAG_SCALE
-                                        scaleY = DRAG_SCALE
+    BoxWithConstraints {
+        val iconSize = gridIconSize(maxWidth / columns, columns, columnGap)
+        Column(
+            Modifier
+                .onSizeChanged { gridSize = it }
+                .then(dragModifier),
+        ) {
+            cells.chunked(columns).forEachIndexed { rowIndex, row ->
+                // The dragged icon's row is drawn last so the icon stays above the other rows.
+                val holdsDragged = from != null && from in row
+                Row(Modifier.zIndex(if (holdsDragged) 1f else 0f)) {
+                    row.forEachIndexed { columnIndex, index ->
+                        val cellModifier = Modifier.weight(1f)
+                        if (index < 0) {
+                            AddCell(iconSize, cellPadding, onAdd, cellModifier)
+                        } else {
+                            val item = items[index]
+                            val action = (item as? ActionItem)?.action
+                            val dragged = index == from
+                            ItemCell(
+                                item = item,
+                                iconSize = iconSize,
+                                switchedOn = action?.takeIf { it in SWITCH_ACTIONS }?.let { it in switches },
+                                editing = editing,
+                                showLabel = showLabels,
+                                verticalPadding = cellPadding,
+                                onClick = {
+                                    when {
+                                        !editing -> onLaunch(item)
+                                        // Letting go of an icon picked up to drag is not a tap on it.
+                                        dragFrom == null -> onEdit(index)
                                     }
-                            },
-                        )
+                                },
+                                onRemove = { onRemove(index) },
+                                modifier = if (!dragged) cellModifier else {
+                                    // Drawn in the cell it would drop into, shifted back under the finger.
+                                    val shift = cellAt(index) + dragOffset - cellAt(rowIndex * columns + columnIndex)
+                                    cellModifier
+                                        .zIndex(1f)
+                                        .graphicsLayer {
+                                            translationX = shift.x
+                                            translationY = shift.y
+                                            scaleX = DRAG_SCALE
+                                            scaleY = DRAG_SCALE
+                                        }
+                                },
+                            )
+                        }
                     }
+                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                 }
-                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
 }
 
 private const val DRAG_SCALE = 1.1f
+
+/** Icons fill their cells but for [columnGap]; without one they have a set size for the number of [columns]. */
+private fun gridIconSize(cellWidth: Dp, columns: Int, columnGap: Dp?): Dp = when {
+    columnGap != null -> (cellWidth - columnGap).coerceAtLeast(MIN_ICON_SIZE)
+    columns >= 6 -> 36.dp
+    columns == 5 -> 40.dp
+    else -> 44.dp
+}
+
+private val MIN_ICON_SIZE = 16.dp
 
 @Composable
 private fun ItemCell(
@@ -876,7 +889,9 @@ fun ItemIcon(item: Item, size: Dp, switchedOn: Boolean? = null) {
     val context = LocalContext.current
     val sizePx = with(LocalDensity.current) { size.roundToPx() }
     val key = InstalledApps.iconKey(item)
-    val bitmap by produceState(key?.let(InstalledApps::cachedIcon), key) {
+    val bitmap by produceState(key?.let { InstalledApps.cachedIcon(it, sizePx) }, key, sizePx) {
+        // The state outlives a change of icon or size, so it starts over from the cache.
+        value = key?.let { InstalledApps.cachedIcon(it, sizePx) }
         if (value == null && key != null) {
             value = withContext(Dispatchers.IO) {
                 when (item) {

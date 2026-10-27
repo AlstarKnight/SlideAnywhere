@@ -134,6 +134,21 @@ class ConfigTest {
     }
 
     @Test
+    fun columnGapIsAutoUntilSetAndStaysInRange() {
+        fun gapAfter(dp: Int?) = (config.setColumnGap("g", dp).pages[0].cards[0] as GridCard).columnGapDp
+        assertEquals(null, (config.pages[0].cards[0] as GridCard).columnGapDp)
+        assertEquals(12, gapAfter(12))
+        assertEquals(COLUMN_GAP_RANGE.last, gapAfter(999))
+        assertEquals(COLUMN_GAP_RANGE.first, gapAfter(-4))
+        val backToAuto = config.setColumnGap("g", 12).setColumnGap("g", null)
+        assertEquals(null, (backToAuto.pages[0].cards[0] as GridCard).columnGapDp)
+        assertEquals(config.setColumnGap("g", 12), parseConfig(config.setColumnGap("g", 12).toJson()))
+        assertEquals(config, config.setColumnGap("n", 12))
+        val withUsage = config.addCard(1, UsageCard("u", "常用", UsageKind.FREQUENT)).setColumnGap("u", 20)
+        assertEquals(20, (withUsage.pages[1].cards[0] as UsageCard).columnGapDp)
+    }
+
+    @Test
     fun systemCardsRoundTripAndRename() {
         val battery = SystemCard("s", "电量", SystemKind.BATTERY)
         val withSystem = config.addCard(1, battery)

@@ -40,7 +40,7 @@ object InstalledApps {
             .sortedWith { a, b -> collator.compare(a.label, b.label) }
     }
 
-    fun cachedIcon(key: String): ImageBitmap? = icons.get(key)
+    fun cachedIcon(key: String, sizePx: Int): ImageBitmap? = icons.get(sizedKey(key, sizePx))
 
     /** Forgets loaded icons, e.g. after the icon pack changed. */
     fun clearIconCache() = icons.evictAll()
@@ -79,11 +79,14 @@ object InstalledApps {
     }
 
     private fun icon(key: String, sizePx: Int, loader: () -> Drawable?): ImageBitmap? {
-        icons.get(key)?.let { return it }
+        cachedIcon(key, sizePx)?.let { return it }
         val bitmap = loader()?.toBitmap(sizePx, sizePx)?.asImageBitmap() ?: return null
-        icons.put(key, bitmap)
+        icons.put(sizedKey(key, sizePx), bitmap)
         return bitmap
     }
+
+    // Icons are kept per size, since grid icons grow and shrink with their spacing.
+    private fun sizedKey(key: String, sizePx: Int) = "$key@$sizePx"
 }
 
 /** Pinyin of Chinese characters for app and widget search, from the system's transliterator (Android 10+). */

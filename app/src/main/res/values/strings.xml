@@ -134,7 +134,10 @@
     <string name="style_no_cards">这一页还没有卡片。</string>
     <string name="card_show_title">显示标题</string>
     <string name="card_show_labels">显示名称</string>
+    <string name="card_column_gap">图标左右间距</string>
+    <string name="column_gap_auto">自动</string>
     <string name="card_row_gap">图标上下间距</string>
+    <string name="card_gap_hint">调了左右间距，图标会放大或缩小来填满剩下的宽度；选「自动」时图标大小只看每行几个。</string>
     <string name="card_height">高度</string>
     <string name="height_auto">自动</string>
     <string name="text_size">文字大小</string>
