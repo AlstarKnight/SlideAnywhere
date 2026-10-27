@@ -14,14 +14,11 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,23 +59,18 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -86,7 +78,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.Dispatchers
@@ -103,7 +94,6 @@ private enum class SettingsPage(@StringRes val title: Int, @StringRes val summar
     PERMISSIONS(R.string.page_permissions, R.string.permissions_all_granted),
     TRIGGER(R.string.page_trigger, R.string.page_trigger_summary),
     THEME(R.string.page_theme, R.string.page_theme_summary),
-    PAGE_STYLE(R.string.page_style, R.string.page_style_summary),
     ADVANCED(R.string.page_advanced, R.string.page_advanced_summary),
     CONFIG(R.string.page_config, R.string.page_config_summary),
     ABOUT(R.string.page_about, R.string.page_about_summary),
@@ -133,12 +123,11 @@ private fun readPermissions(context: Context) = Permissions(
     battery = context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName),
 )
 
-/** [stylePage] opens the look of that panel page straight away. */
 @Composable
-fun SettingsScreen(prefs: Prefs, stylePage: Int? = null) {
+fun SettingsScreen(prefs: Prefs) {
     val context = LocalContext.current
     var permissions by remember { mutableStateOf(readPermissions(context)) }
-    var page by rememberSaveable { mutableStateOf(if (stylePage != null) SettingsPage.PAGE_STYLE else null) }
+    var page by rememberSaveable { mutableStateOf<SettingsPage?>(null) }
 
     LifecycleResumeEffect(Unit) {
         permissions = readPermissions(context)
@@ -163,7 +152,6 @@ fun SettingsScreen(prefs: Prefs, stylePage: Int? = null) {
                     }
                     SettingsPage.TRIGGER -> TriggerSettings(prefs, permissions.accessibility)
                     SettingsPage.THEME -> ThemeSettings(prefs)
-                    SettingsPage.PAGE_STYLE -> PageStyleSettings(prefs, stylePage ?: 0)
                     SettingsPage.ADVANCED -> AdvancedSettings(prefs, permissions.accessibility)
                     SettingsPage.CONFIG -> ConfigSettings()
                     SettingsPage.ABOUT -> AboutSettings()
@@ -242,7 +230,6 @@ private fun pageIcon(page: SettingsPage): Painter = when (page) {
     SettingsPage.PERMISSIONS -> painterResource(R.drawable.ic_action_lock)
     SettingsPage.TRIGGER -> painterResource(R.drawable.ic_action_tune)
     SettingsPage.THEME -> painterResource(R.drawable.ic_action_visibility)
-    SettingsPage.PAGE_STYLE -> painterResource(R.drawable.ic_action_photo_library)
     SettingsPage.ADVANCED -> painterResource(R.drawable.ic_action_settings)
     SettingsPage.CONFIG -> rememberVectorPainter(Icons.Default.Share)
     SettingsPage.ABOUT -> rememberVectorPainter(Icons.Default.Info)
@@ -491,262 +478,6 @@ private fun ThemeSettings(prefs: Prefs) {
         Hint(stringResource(R.string.scrim_hint))
     }
 }
-
-/**
- * The look of each panel page, after the original app's page settings: its own theme, a background picture, how
- * see-through the page and its cards are, and how each card shows.
- */
-@Composable
-private fun PageStyleSettings(prefs: Prefs, initialPage: Int) {
-    val context = LocalContext.current
-    val store = remember { ConfigStore.get(context) }
-    val config by store.config.collectAsState()
-    var selected by rememberSaveable { mutableIntStateOf(initialPage) }
-    val index = selected.coerceIn(0, config.pages.lastIndex)
-    if (config.pages.size > 1) {
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            config.pages.indices.forEach { i ->
-                FilterChip(
-                    selected = i == index,
-                    onClick = { selected = i },
-                    label = { Text(stringResource(R.string.page_number, i + 1)) },
-                )
-            }
-        }
-    }
-    val page = config.pages[index]
-    val style = page.style
-    fun update(transform: (PageStyle) -> PageStyle) = store.update { it.setPageStyle(index, transform) }
-    // Fresh sliders for every page, since they keep their own position while being dragged.
-    key(index) {
-        SectionTitle(stringResource(R.string.section_theme))
-        Section {
-            SwitchRow(stringResource(R.string.page_own_theme), style.preset != null || style.darkMode != null) { on ->
-                update { it.copy(preset = if (on) prefs.themePreset else null, darkMode = null) }
-            }
-            if (style.preset != null || style.darkMode != null) {
-                ThemePicker(style.preset) { preset -> update { it.copy(preset = preset) } }
-                ChoiceRow(
-                    stringResource(R.string.setting_dark_mode),
-                    listOf(
-                        null to R.string.style_default,
-                        DarkMode.LIGHT to R.string.dark_mode_light,
-                        DarkMode.DARK to R.string.dark_mode_dark,
-                    ),
-                    style.darkMode,
-                ) { mode -> update { it.copy(darkMode = mode) } }
-            }
-            Hint(stringResource(R.string.page_own_theme_hint))
-        }
-        SectionTitle(stringResource(R.string.section_background))
-        Section {
-            BackgroundPicture(style.background) { name ->
-                update { it.copy(background = name) }
-                BackgroundImages.deleteUnused(context, store.config.value)
-            }
-            if (style.background != null) {
-                ChoiceRow(
-                    stringResource(R.string.background_fit),
-                    listOf(
-                        BackgroundFit.CROP to R.string.fit_crop,
-                        BackgroundFit.FILL_WIDTH to R.string.fit_fill_width,
-                        BackgroundFit.STRETCH to R.string.fit_stretch,
-                    ),
-                    style.backgroundFit,
-                ) { fit -> update { it.copy(backgroundFit = fit) } }
-                Hint(stringResource(R.string.background_fit_hint))
-            }
-            SliderRow(
-                stringResource(R.string.background_transparency),
-                "%",
-                style.backgroundTransparency,
-                TRANSPARENCY_RANGE,
-            ) { value -> update { it.copy(backgroundTransparency = value) } }
-            SliderRow(stringResource(R.string.card_transparency), "%", style.cardTransparency, TRANSPARENCY_RANGE) { value ->
-                update { it.copy(cardTransparency = value) }
-            }
-            Hint(stringResource(R.string.transparency_hint))
-        }
-        SectionTitle(stringResource(R.string.section_cards))
-        if (page.cards.isEmpty()) Section { Hint(stringResource(R.string.style_no_cards)) }
-        page.cards.forEach { card -> key(card.id) { CardStyleSection(card, store) } }
-    }
-    OutlinedButton(onClick = { PanelService.openPanel(context, index) }, modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.style_preview))
-    }
-}
-
-/** The page's background picture, with buttons to pick, change or remove it. */
-@Composable
-private fun BackgroundPicture(name: String?, onChange: (String?) -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val picture = withContext(Dispatchers.IO) { BackgroundImages.import(context, uri) }
-            if (picture == null) toast(context, R.string.background_failed) else onChange(picture)
-        }
-    }
-    val pick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
-    if (name == null) {
-        OutlinedButton(onClick = pick, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.background_pick))
-        }
-        return
-    }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        val shape = RoundedCornerShape(8.dp)
-        Box(
-            Modifier
-                .size(width = 54.dp, height = 96.dp)
-                .clip(shape)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape),
-        ) {
-            rememberBackground(name)?.let {
-                Image(it, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            }
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = pick, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.background_change))
-            }
-            OutlinedButton(onClick = { onChange(null) }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.background_remove))
-            }
-        }
-    }
-}
-
-/**
- * How one card shows: its title, the names under its icons and their spacing, its height, and a text card's text
- * style.
- */
-@Composable
-private fun CardStyleSection(card: Card, store: ConfigStore) {
-    Section {
-        Text(card.title, style = MaterialTheme.typography.titleMedium)
-        // A text card never shows its title.
-        if (card !is TextCard) {
-            SwitchRow(stringResource(R.string.card_show_title), card.showTitle) { show ->
-                store.update { it.setShowTitle(card.id, show) }
-            }
-        }
-        val showLabels = when (card) {
-            is GridCard -> card.showLabels
-            is UsageCard -> card.showLabels
-            else -> null
-        }
-        if (showLabels != null) {
-            SwitchRow(stringResource(R.string.card_show_labels), showLabels) { show ->
-                store.update { it.setShowLabels(card.id, show) }
-            }
-        }
-        val gaps = when (card) {
-            is GridCard -> card.columnGapDp to card.rowGapDp
-            is UsageCard -> card.columnGapDp to card.rowGapDp
-            else -> null
-        }
-        if (gaps != null) {
-            val (columnGap, rowGap) = gaps
-            // The slider's first stop, left of 0, is "auto".
-            val auto = stringResource(R.string.column_gap_auto)
-            SliderRow(
-                stringResource(R.string.card_column_gap),
-                "dp",
-                columnGap ?: AUTO_COLUMN_GAP_STOP,
-                AUTO_COLUMN_GAP_STOP..COLUMN_GAP_RANGE.last,
-                step = GAP_STEP,
-                valueText = { if (it < 0) auto else "${it}dp" },
-            ) { dp -> store.update { it.setColumnGap(card.id, dp.takeIf { gap -> gap >= 0 }) } }
-            SliderRow(stringResource(R.string.card_row_gap), "dp", rowGap, ROW_GAP_RANGE, step = GAP_STEP) { dp ->
-                store.update { it.setRowGap(card.id, dp) }
-            }
-            Hint(stringResource(R.string.card_gap_hint))
-        }
-        val height = when (card) {
-            is TextCard -> card.heightDp
-            is NoteCard -> card.heightDp
-            is WidgetCard -> card.heightDp
-            else -> null
-        }
-        if (height != null) {
-            val widget = card is WidgetCard
-            val auto = stringResource(R.string.height_auto)
-            SliderRow(
-                stringResource(R.string.card_height),
-                "dp",
-                height,
-                if (widget) WIDGET_HEIGHT_RANGE else CARD_HEIGHT_RANGE,
-                step = if (widget) WIDGET_HEIGHT_STEP else CARD_HEIGHT_STEP,
-                valueText = { if (it == AUTO_HEIGHT) auto else "${it}dp" },
-            ) { dp -> store.update { it.setCardHeight(card.id, dp) } }
-        }
-        if (card is TextCard) TextStyleRows(card, store)
-    }
-}
-
-private const val CARD_HEIGHT_STEP = 8
-private const val GAP_STEP = 4
-private const val AUTO_COLUMN_GAP_STOP = -GAP_STEP
-
-@Composable
-private fun TextStyleRows(card: TextCard, store: ConfigStore) {
-    fun update(transform: (TextCard) -> TextCard) = store.update { it.updateTextCard(card.id, transform) }
-    SliderRow(stringResource(R.string.text_size), "sp", card.textSize, TEXT_SIZE_RANGE) { size ->
-        update { it.copy(textSize = size) }
-    }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterChip(
-            selected = card.bold,
-            onClick = { update { it.copy(bold = !it.bold) } },
-            label = { Text(stringResource(R.string.text_bold)) },
-        )
-        FilterChip(
-            selected = card.italic,
-            onClick = { update { it.copy(italic = !it.italic) } },
-            label = { Text(stringResource(R.string.text_italic)) },
-        )
-        FilterChip(
-            selected = card.centered,
-            onClick = { update { it.copy(centered = !it.centered) } },
-            label = { Text(stringResource(R.string.text_centered)) },
-        )
-    }
-    SwitchRow(stringResource(R.string.text_card_background), card.cardBackground) { on ->
-        update { it.copy(cardBackground = on) }
-    }
-    Text(stringResource(R.string.text_color))
-    FilterChip(
-        selected = card.color == null,
-        onClick = { update { it.copy(color = null) } },
-        label = { Text(stringResource(R.string.text_color_theme)) },
-    )
-    TEXT_COLORS.chunked(5).forEach { row ->
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            row.forEach { color ->
-                val chosen = color.equals(card.color, ignoreCase = true)
-                Box(
-                    Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(Color(color.toColorInt()))
-                        .border(
-                            if (chosen) 3.dp else 1.dp,
-                            if (chosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                            CircleShape,
-                        )
-                        .clickable { update { it.copy(color = color) } },
-                )
-            }
-        }
-    }
-}
-
-private val TEXT_COLORS = listOf(
-    "#FFFFFF", "#9E9E9E", "#000000", "#F44336", "#FF9800",
-    "#FFEB3B", "#4CAF50", "#2196F3", "#9C27B0", "#E91E63",
-)
 
 @Composable
 private fun AdvancedSettings(prefs: Prefs, accessibilityEnabled: Boolean) {
@@ -1075,13 +806,13 @@ private fun AppListDialog(title: String, selected: Set<String>, onDone: (Set<Str
 private fun actionLabel(action: Action?): String = stringResource(action?.labelRes ?: R.string.ball_action_panel)
 
 @Composable
-private fun Hint(text: String) {
+fun Hint(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 /** One tile per preset, showing a swatch of its accent. */
 @Composable
-private fun ThemePicker(selected: ThemePreset?, onSelect: (ThemePreset) -> Unit) {
+fun ThemePicker(selected: ThemePreset?, onSelect: (ThemePreset) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         ThemePreset.entries.forEach { preset ->
             val shape = RoundedCornerShape(12.dp)
@@ -1118,7 +849,7 @@ private fun ThemePicker(selected: ThemePreset?, onSelect: (ThemePreset) -> Unit)
 
 /** A title with one chip per option below it. */
 @Composable
-private fun <T> ChoiceRow(title: String, options: List<Pair<T, Int>>, selected: T, onSelect: (T) -> Unit) {
+fun <T> ChoiceRow(title: String, options: List<Pair<T, Int>>, selected: T, onSelect: (T) -> Unit) {
     Column {
         Text(title)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1148,7 +879,7 @@ private fun Section(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun SwitchRow(title: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+fun SwitchRow(title: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(title, Modifier.weight(1f))
         Switch(checked = checked, onCheckedChange = onChange)
@@ -1157,7 +888,7 @@ private fun SwitchRow(title: String, checked: Boolean, onChange: (Boolean) -> Un
 
 /** A slider over [range] that moves in steps of [step]; it keeps its own position, starting from [initial]. */
 @Composable
-private fun SliderRow(
+fun SliderRow(
     title: String,
     unit: String,
     initial: Int,

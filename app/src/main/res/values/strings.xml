@@ -16,7 +16,6 @@
     <string name="page_theme">主题外观</string>
     <string name="page_theme_summary">主题、深浅色、图标包、面板宽度、模糊和遮罩</string>
     <string name="page_style">页面外观</string>
-    <string name="page_style_summary">每页的主题、背景图片、透明度，卡片的标题、名称、图标间距和高度</string>
     <string name="page_advanced">高级设置</string>
     <string name="page_advanced_summary">黑名单/白名单、横屏隐藏、磁贴和桌面快捷方式、通知</string>
     <string name="page_config">配置管理</string>
@@ -113,11 +112,9 @@
     <string name="setting_scrim">背景遮罩</string>
     <string name="scrim_hint">打开面板时把后面的界面调暗多少，调到 0 就不调暗。下次打开面板时生效。</string>
 
-    <string name="page_number">第 %d 页</string>
     <string name="page_own_theme">本页单独设置主题</string>
     <string name="page_own_theme_hint">关闭时跟随「主题外观」里的主题和深浅色；深浅色选「默认」时也跟随那里。</string>
     <string name="style_default">默认</string>
-    <string name="section_background">背景</string>
     <string name="background_pick">选择背景图片</string>
     <string name="background_change">更换图片</string>
     <string name="background_remove">移除图片</string>
@@ -130,8 +127,6 @@
     <string name="background_transparency">背景透明度</string>
     <string name="card_transparency">卡片透明度</string>
     <string name="transparency_hint">调高后能透过面板看到后面的界面，搭配「主题外观」里的背景模糊效果更好。</string>
-    <string name="section_cards">卡片</string>
-    <string name="style_no_cards">这一页还没有卡片。</string>
     <string name="card_show_title">显示标题</string>
     <string name="card_show_labels">显示名称</string>
     <string name="card_column_gap">图标左右间距</string>
@@ -147,11 +142,10 @@
     <string name="text_card_background">显示卡片底色</string>
     <string name="text_color">文字颜色</string>
     <string name="text_color_theme">跟随主题</string>
-    <string name="style_preview">打开面板看看这一页</string>
 
     <string name="panel_open_settings">设置</string>
     <string name="panel_empty_page">这一页还没有卡片。点右上角的编辑按钮或长按卡片标题，可以添加卡片。</string>
-    <string name="edit_start">编辑</string>
+    <string name="edit_start">编辑页面</string>
     <string name="edit_done">完成</string>
     <string name="cancel">取消</string>
     <string name="done">确定</string>
@@ -165,6 +159,8 @@
     <string name="new_grid_card_title">新卡片</string>
 
     <string name="card_drag">按住拖动排序</string>
+    <string name="page_edit_hint">点卡片右上角的调节按钮或长按卡片标题，可以单独编辑这张卡片；按住 ≡ 可拖动卡片。添加卡片、页面和页面外观在最下面。</string>
+    <string name="card_edit">编辑这张卡片</string>
     <string name="edit_drag_hint">点图标可改名称，长按图标可拖动换位置；按住卡片右上角的 ≡ 可拖动卡片</string>
     <string name="card_rename">重命名</string>
     <string name="card_delete">删除卡片</string>
@@ -293,7 +289,6 @@
     <string name="widget_option_details">%1$s · %2$d×%3$d</string>
     <string name="widget_failed">无法设置这个小部件</string>
     <string name="widget_missing">这个小部件已失效（可能对应的应用被卸载了），可以删除这张卡片。</string>
-    <string name="widget_height">高度 %d dp</string>
     <string name="launch_failed">无法打开</string>
 
     <string name="accessibility_label">SlideX 快捷操作</string>

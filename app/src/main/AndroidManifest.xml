@@ -63,6 +63,14 @@
             android:exported="false"
             android:taskAffinity="" />
 
+        <!-- Started from the panel to pick a page's background picture; shows nothing of its own. -->
+        <activity
+            android:name=".BackgroundPickerActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Invisible" />
+
         <service
             android:name=".PanelService"
             android:exported="false"

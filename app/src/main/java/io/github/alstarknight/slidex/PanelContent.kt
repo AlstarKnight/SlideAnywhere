@@ -76,7 +76,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -103,20 +104,24 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** The panel itself: swipeable pages of cards, with an edit mode for changing them. */
+/**
+ * The panel itself: swipeable pages of cards. A page is edited on the page (its cards, the pages and its look), and
+ * each card on its own.
+ */
 @Composable
 fun PanelContent(
     store: ConfigStore,
     launcher: ItemLauncher,
     initialPage: Int,
     onOpenSettings: () -> Unit,
-    onOpenPageStyle: (page: Int) -> Unit,
     onClose: () -> Unit,
 ) {
     val context = LocalContext.current
     val config by store.config.collectAsState()
     val switches by launcher.switches.collectAsState()
-    var editing by remember { mutableStateOf(false) }
+    var editingPage by remember { mutableStateOf(false) }
+    // The card being edited on its own, by id.
+    var editingCard by remember { mutableStateOf<String?>(null) }
     var addingToCard by remember { mutableStateOf<String?>(null) }
     // The icon being renamed: its card's id and its index in the card.
     var renamingItem by remember { mutableStateOf<Pair<String, Int>?>(null) }
@@ -127,7 +132,9 @@ fun PanelContent(
     val baseTheme = LocalThemeExtras.current
 
     LaunchedEffect(Unit) { launcher.refreshSwitches() }
-    BackHandler(enabled = editing) { editing = false }
+    BackHandler(enabled = editingPage || editingCard != null) {
+        if (editingCard != null) editingCard = null else editingPage = false
+    }
 
     Box(Modifier.fillMaxSize()) {
         // Every page brings its own background, which slides in and out with it.
@@ -143,9 +150,9 @@ fun PanelContent(
                     ) {
                         // Room for the header, which stays in place above the pages.
                         Spacer(Modifier.height(HEADER_HEIGHT))
-                        if (editing) {
+                        if (editingPage) {
                             Text(
-                                stringResource(R.string.edit_drag_hint),
+                                stringResource(R.string.page_edit_hint),
                                 Modifier.padding(horizontal = 16.dp),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -188,9 +195,11 @@ fun PanelContent(
                                             },
                                         )
                                     },
-                                    editing = editing,
+                                    editing = card.id == editingCard,
+                                    pageEditing = editingPage,
                                     switches = switches,
-                                    onStartEditing = { editing = true },
+                                    onStartEditing = { editingCard = card.id },
+                                    onDoneEditing = { editingCard = null },
                                     onLaunch = { item ->
                                         when {
                                             item is ActionItem && item.action == Action.APP_DRAWER -> showingDrawer = true
@@ -204,36 +213,29 @@ fun PanelContent(
                                     cardOpacity = 1f - page.style.cardTransparency.coerceIn(TRANSPARENCY_RANGE) / 100f,
                                 )
                             }
-                            if (shownCards.isEmpty() && !editing) {
+                            if (shownCards.isEmpty() && !editingPage) {
                                 item { EmptyPageHint() }
                             }
-                            if (editing) {
+                            if (editingPage) {
+                                // A new card opens for editing straight away.
+                                fun addCard(card: Card) {
+                                    store.update { it.addCard(pageIndex, card) }
+                                    editingCard = card.id
+                                }
                                 item {
                                     PageEditor(
                                         canDelete = config.pages.size > 1,
                                         canMoveLeft = pageIndex > 0,
                                         canMoveRight = pageIndex < config.pages.size - 1,
-                                        onAddGrid = {
-                                            val title = it
-                                            store.update { c -> c.addCard(pageIndex, GridCard(ConfigStore.newId(), title)) }
-                                        },
-                                        onAddNote = {
-                                            val title = it
-                                            store.update { c -> c.addCard(pageIndex, NoteCard(ConfigStore.newId(), title)) }
-                                        },
-                                        onAddText = {
-                                            val title = it
-                                            store.update { c -> c.addCard(pageIndex, TextCard(ConfigStore.newId(), title)) }
-                                        },
-                                        onAddHitokoto = {
-                                            val title = it
-                                            store.update { c -> c.addCard(pageIndex, HitokotoCard(ConfigStore.newId(), title)) }
-                                        },
+                                        onAddGrid = { addCard(GridCard(ConfigStore.newId(), it)) },
+                                        onAddNote = { addCard(NoteCard(ConfigStore.newId(), it)) },
+                                        onAddText = { addCard(TextCard(ConfigStore.newId(), it)) },
+                                        onAddHitokoto = { addCard(HitokotoCard(ConfigStore.newId(), it)) },
                                         onAddSystem = { kind, title ->
-                                            store.update { c -> c.addCard(pageIndex, SystemCard(ConfigStore.newId(), title, kind)) }
+                                            addCard(SystemCard(ConfigStore.newId(), title, kind))
                                         },
                                         onAddUsage = { kind, title ->
-                                            store.update { c -> c.addCard(pageIndex, UsageCard(ConfigStore.newId(), title, kind)) }
+                                            addCard(UsageCard(ConfigStore.newId(), title, kind))
                                         },
                                         onAddWidget = {
                                             val intent = WidgetPickerActivity.intent(context, pageIndex)
@@ -253,8 +255,14 @@ fun PanelContent(
                                             store.update { it.movePage(pageIndex, offset) }
                                             scope.launch { pagerState.scrollToPage(pageIndex + offset) }
                                         },
-                                        onOpenStyle = { onOpenPageStyle(pageIndex) },
                                     )
+                                }
+                                item {
+                                    PageStyleEditor(pageIndex, page.style, store) {
+                                        val intent = BackgroundPickerActivity.intent(context, pageIndex)
+                                        context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                                        onClose()
+                                    }
                                 }
                             }
                         }
@@ -266,8 +274,15 @@ fun PanelContent(
         PageTheme(config.pages.getOrNull(pagerState.currentPage)?.style ?: PageStyle(), baseTheme) {
             PanelHeader(
                 pageLabel = if (config.pages.size > 1) "${pagerState.currentPage + 1} / ${config.pages.size}" else null,
-                editing = editing,
-                onToggleEditing = { editing = !editing },
+                editing = editingPage || editingCard != null,
+                onToggleEditing = {
+                    if (editingPage || editingCard != null) {
+                        editingPage = false
+                        editingCard = null
+                    } else {
+                        editingPage = true
+                    }
+                },
                 onOpenSettings = onOpenSettings,
             )
         }
@@ -408,9 +423,13 @@ private fun PanelCard(
     card: Card,
     modifier: Modifier,
     dragHandle: Modifier,
+    /** Whether this card is being edited. */
     editing: Boolean,
+    /** Whether its page is being edited, which shows every card's title row with buttons to edit, delete and move. */
+    pageEditing: Boolean,
     switches: Set<Action>,
     onStartEditing: () -> Unit,
+    onDoneEditing: () -> Unit,
     onLaunch: (Item) -> Unit,
     store: ConfigStore,
     onAddItem: () -> Unit,
@@ -419,7 +438,7 @@ private fun PanelCard(
     cardOpacity: Float,
 ) {
     // Outside edit mode a text card is only its text, straight on the page unless it asks for a card.
-    if (card is TextCard && !editing && !card.cardBackground) {
+    if (card is TextCard && !editing && !pageEditing && !card.cardBackground) {
         CardText(card, onStartEditing, modifier.padding(horizontal = 12.dp))
         return
     }
@@ -434,10 +453,15 @@ private fun PanelCard(
         border = LocalThemeExtras.current.cardBorder,
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            if (editing || card.showTitle) CardHeader(card, editing, dragHandle, onStartEditing, store)
+            if (editing || pageEditing || card.showTitle) {
+                CardHeader(card, editing, pageEditing, dragHandle, onStartEditing, onDoneEditing, store)
+            }
             when (card) {
                 is GridCard -> {
-                    if (editing) ColumnsStepper(card.columns) { n -> store.update { it.setColumns(card.id, n) } }
+                    if (editing) {
+                        ColumnsStepper(card.columns) { n -> store.update { it.setColumns(card.id, n) } }
+                        Hint(stringResource(R.string.edit_drag_hint))
+                    }
                     ItemGrid(
                         items = card.items,
                         columns = card.columns,
@@ -458,8 +482,9 @@ private fun PanelCard(
                 is HitokotoCard -> HitokotoContent(onStartEditing)
                 is SystemCard -> SystemCardContent(card.kind, onClose)
                 is UsageCard -> UsageCardContent(card, editing, store, onLaunch, onClose)
-                is WidgetCard -> WidgetCardContent(card, editing, store, onClose)
+                is WidgetCard -> WidgetCardContent(card, editing, onClose)
             }
+            if (editing) CardStyleControls(card, store)
         }
     }
 }
@@ -516,14 +541,8 @@ private const val USAGE_ROWS = 2
 
 /** Another app's widget. A tap on it usually opens that app, so the panel closes to show it. */
 @Composable
-private fun WidgetCardContent(card: WidgetCard, editing: Boolean, store: ConfigStore, onClose: () -> Unit) {
+private fun WidgetCardContent(card: WidgetCard, editing: Boolean, onClose: () -> Unit) {
     val context = LocalContext.current
-    if (editing) {
-        val text = stringResource(R.string.widget_height, card.heightDp)
-        Stepper(text, card.heightDp, WIDGET_HEIGHT_RANGE, WIDGET_HEIGHT_STEP) { dp ->
-            store.update { it.setCardHeight(card.id, dp) }
-        }
-    }
     val info = remember(card.widgetId) { AppWidgetManager.getInstance(context).getAppWidgetInfo(card.widgetId) }
     if (info == null) {
         Text(
@@ -592,12 +611,18 @@ private fun Stepper(text: String, value: Int, range: IntRange, step: Int = 1, on
     }
 }
 
+/**
+ * A card's title row. While the card is edited it has buttons to rename, delete, move and finish; while only its
+ * page is, buttons to edit, delete and move it. A long press on the title edits the card.
+ */
 @Composable
 private fun CardHeader(
     card: Card,
     editing: Boolean,
+    pageEditing: Boolean,
     dragHandle: Modifier,
     onStartEditing: () -> Unit,
+    onDoneEditing: () -> Unit,
     store: ConfigStore,
 ) {
     val context = LocalContext.current
@@ -633,8 +658,12 @@ private fun CardHeader(
             style = MaterialTheme.typography.titleMedium,
         )
         if (editing) {
-            SmallIconButton(Icons.Default.Edit, R.string.card_rename) { renaming = true }
-            SmallIconButton(Icons.Default.Delete, R.string.card_delete) {
+            SmallIconButton(rememberVectorPainter(Icons.Default.Edit), R.string.card_rename) { renaming = true }
+        } else if (pageEditing) {
+            SmallIconButton(painterResource(R.drawable.ic_action_tune), R.string.card_edit, onStartEditing)
+        }
+        if (editing || pageEditing) {
+            SmallIconButton(rememberVectorPainter(Icons.Default.Delete), R.string.card_delete) {
                 store.update { it.removeCard(card.id) }
                 if (card is WidgetCard) WidgetHost.deleteUnused(context, store.config.value)
             }
@@ -646,11 +675,12 @@ private fun CardHeader(
                     .padding(8.dp),
             )
         }
+        if (editing) SmallIconButton(rememberVectorPainter(Icons.Default.Check), R.string.edit_done, onDoneEditing)
     }
 }
 
 @Composable
-private fun SmallIconButton(icon: ImageVector, description: Int, onClick: () -> Unit) {
+private fun SmallIconButton(icon: Painter, description: Int, onClick: () -> Unit) {
     IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
         Icon(icon, contentDescription = stringResource(description), modifier = Modifier.size(20.dp))
     }
@@ -1089,7 +1119,6 @@ private fun PageEditor(
     onAddPage: () -> Unit,
     onDeletePage: () -> Unit,
     onMovePage: (Int) -> Unit,
-    onOpenStyle: () -> Unit,
 ) {
     val gridTitle = stringResource(R.string.new_grid_card_title)
     val noteTitle = stringResource(R.string.default_card_note)
@@ -1126,7 +1155,6 @@ private fun PageEditor(
             R.string.page_move_left to { onMovePage(-1) }.takeIf { canMoveLeft },
             R.string.page_move_right to { onMovePage(1) }.takeIf { canMoveRight },
         )
-        ButtonRow(R.string.page_style to onOpenStyle)
     }
 }
 

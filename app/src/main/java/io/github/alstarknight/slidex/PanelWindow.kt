@@ -34,7 +34,6 @@ class PanelWindow(
     private val store: ConfigStore,
     private val launcher: ItemLauncher,
     private val onOpenSettings: () -> Unit,
-    private val onOpenPageStyle: (page: Int) -> Unit,
     private val onClosed: () -> Unit,
 ) {
     private val owner = OverlayLifecycleOwner()
@@ -72,10 +71,6 @@ class PanelWindow(
                             onOpenSettings = {
                                 hide()
                                 onOpenSettings()
-                            },
-                            onOpenPageStyle = { page ->
-                                hide()
-                                onOpenPageStyle(page)
                             },
                             onClose = ::hide,
                         )

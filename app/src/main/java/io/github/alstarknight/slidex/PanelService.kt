@@ -237,7 +237,6 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             onOpenSettings = {
                 startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             },
-            onOpenPageStyle = { page -> startActivity(MainActivity.pageStyleIntent(this, page)) },
             onClosed = {
                 panel = null
                 updateTriggerVisibility()
