@@ -143,6 +143,8 @@ private fun BrightnessSlider(onClose: () -> Unit) {
     var value by remember {
         mutableFloatStateOf(Settings.System.getInt(resolver, Settings.System.SCREEN_BRIGHTNESS, max / 2).toFloat())
     }
+    // What this drag last wrote, or null before its first change; the slider moves many times per step.
+    var written by remember { mutableStateOf<Int?>(null) }
     val seeThrough = LocalPanelSeeThrough.current
     DisposableEffect(seeThrough) { onDispose { seeThrough(false) } }
     Slider(
@@ -150,19 +152,28 @@ private fun BrightnessSlider(onClose: () -> Unit) {
         onValueChange = {
             seeThrough(true)
             value = it
-            try {
-                Settings.System.putInt(
-                    resolver,
-                    Settings.System.SCREEN_BRIGHTNESS_MODE,
-                    Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
-                )
-                Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, it.roundToInt())
-            } catch (e: SecurityException) {
-                // Lost the permission while the panel was open; the slider just stops having an effect.
+            val brightness = it.roundToInt()
+            if (brightness != written) {
+                try {
+                    if (written == null) {
+                        Settings.System.putInt(
+                            resolver,
+                            Settings.System.SCREEN_BRIGHTNESS_MODE,
+                            Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
+                        )
+                    }
+                    Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, brightness)
+                    written = brightness
+                } catch (e: SecurityException) {
+                    // Lost the permission while the panel was open; the slider just stops having an effect.
+                }
             }
         },
         valueRange = 1f..max.toFloat(),
-        onValueChangeFinished = { seeThrough(false) },
+        onValueChangeFinished = {
+            written = null
+            seeThrough(false)
+        },
     )
 }
 
@@ -189,18 +200,25 @@ private fun VolumeRow(label: Int, stream: Int) {
     val min = remember(stream) { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) audio.getStreamMinVolume(stream) else 0 }
     val max = remember(stream) { audio.getStreamMaxVolume(stream).coerceAtLeast(min + 1) }
     var value by remember(stream) { mutableFloatStateOf(audio.getStreamVolume(stream).toFloat()) }
+    // What this drag last set, or null before its first change; the slider reports each step many times.
+    var written by remember(stream) { mutableStateOf<Int?>(null) }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(stringResource(label), Modifier.width(48.dp), style = MaterialTheme.typography.bodyMedium)
         Slider(
             value = value,
             onValueChange = {
                 value = it
-                try {
-                    audio.setStreamVolume(stream, it.roundToInt(), 0)
-                } catch (e: SecurityException) {
-                    // Changing the ringer volume can need Do Not Disturb access; leave it as it is.
+                val volume = it.roundToInt()
+                if (volume != written) {
+                    try {
+                        audio.setStreamVolume(stream, volume, 0)
+                        written = volume
+                    } catch (e: SecurityException) {
+                        // Changing the ringer volume can need Do Not Disturb access; leave it as it is.
+                    }
                 }
             },
+            onValueChangeFinished = { written = null },
             modifier = Modifier.weight(1f),
             valueRange = min.toFloat()..max.toFloat(),
             steps = (max - min - 1).coerceAtLeast(0),
