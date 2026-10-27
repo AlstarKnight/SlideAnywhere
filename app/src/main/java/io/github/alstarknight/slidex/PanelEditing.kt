@@ -204,7 +204,7 @@ fun PageStyleEditor(pageIndex: Int, style: PageStyle, store: ConfigStore, onPick
                     OutlinedButton(
                         onClick = {
                             update { it.copy(background = null) }
-                            BackgroundImages.deleteUnused(context, store.config.value)
+                            store.deleteUnused()
                         },
                         modifier = Modifier.weight(1f),
                     ) {

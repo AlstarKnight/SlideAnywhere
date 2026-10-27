@@ -133,6 +133,7 @@ fun PanelContent(
     val scope = rememberCoroutineScope()
     // The look chosen in the settings; a page can have a look of its own on top of it.
     val baseTheme = LocalThemeExtras.current
+    val appearance = LocalAppearance.current
 
     LaunchedEffect(Unit) { launcher.refreshSwitches() }
     BackHandler(enabled = editingPage || editingCard != null) {
@@ -172,8 +173,8 @@ fun PanelContent(
                         LazyColumn(
                             Modifier.fillMaxSize(),
                             state = listState,
-                            contentPadding = PaddingValues(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(appearance.panelPaddingDp.dp),
+                            verticalArrangement = Arrangement.spacedBy(appearance.cardGapDp.dp),
                         ) {
                             items(shownCards, key = { it.id }) { card ->
                                 PanelCard(
@@ -252,8 +253,7 @@ fun PanelContent(
                                         },
                                         onDeletePage = {
                                             store.update { it.removePage(pageIndex) }
-                                            WidgetHost.deleteUnused(context, store.config.value)
-                                            BackgroundImages.deleteUnused(context, store.config.value)
+                                            store.deleteUnused()
                                         },
                                         onMovePage = { offset ->
                                             store.update { it.movePage(pageIndex, offset) }
@@ -420,10 +420,10 @@ private fun PanelHeader(pageLabel: String?, editing: Boolean, onToggleEditing: (
 
 private val HEADER_HEIGHT = 56.dp
 
-/** The page's theme color or picture, as see-through as the page is set to be. */
+/** The page's color (the theme's, or the one set in the settings) or picture, as see-through as the page is set. */
 @Composable
 private fun PageBackground(style: PageStyle) {
-    val color = MaterialTheme.colorScheme.surfaceContainer
+    val color = LocalAppearance.current.backgroundColor?.let(::appearanceColor) ?: MaterialTheme.colorScheme.surfaceContainer
     val picture = style.background?.let { rememberBackground(it) }
     val opacity = 1f - style.backgroundTransparency.coerceIn(TRANSPARENCY_RANGE) / 100f
     Canvas(Modifier.fillMaxSize()) { drawPageBackground(color, picture, style.backgroundFit, opacity) }
@@ -458,9 +458,10 @@ private fun PanelCard(
     onClose: () -> Unit,
     cardOpacity: Float,
 ) {
+    val padding = LocalAppearance.current.cardPaddingDp
     // Outside edit mode a text card is only its text, straight on the page unless it asks for a card.
     if (card is TextCard && !editing && !pageEditing && !card.cardBackground) {
-        CardText(card, onStartEditing, modifier.padding(horizontal = 12.dp))
+        CardText(card, onStartEditing, modifier.padding(horizontal = padding.dp))
         return
     }
     val colors = MaterialTheme.colorScheme
@@ -473,7 +474,7 @@ private fun PanelCard(
         ),
         border = LocalThemeExtras.current.cardBorder,
     ) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Column(Modifier.padding(horizontal = padding.dp, vertical = (padding * 2 / 3).dp)) {
             if (editing || pageEditing || card.showTitle) {
                 CardHeader(card, editing, pageEditing, dragHandle, onStartEditing, onDoneEditing, store)
             }
@@ -647,7 +648,6 @@ private fun CardHeader(
     onDoneEditing: () -> Unit,
     store: ConfigStore,
 ) {
-    val context = LocalContext.current
     var renaming by remember(card.id) { mutableStateOf(false) }
     if (editing && renaming) {
         var title by remember(card.id) { mutableStateOf(card.title) }
@@ -687,7 +687,7 @@ private fun CardHeader(
         if (editing || pageEditing) {
             SmallIconButton(rememberVectorPainter(Icons.Default.Delete), R.string.card_delete) {
                 store.update { it.removeCard(card.id) }
-                if (card is WidgetCard) WidgetHost.deleteUnused(context, store.config.value)
+                if (card is WidgetCard) store.deleteUnused()
             }
             Icon(
                 Icons.Default.Menu,
@@ -898,7 +898,7 @@ private fun ItemCell(
             Text(
                 item.label,
                 Modifier.padding(top = 4.dp, start = 2.dp, end = 2.dp),
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = LocalAppearance.current.labelSizeSp.sp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -965,10 +965,13 @@ fun ItemIcon(item: Item, size: Dp, switchedOn: Boolean? = null) {
 @Composable
 private fun BadgeIcon(item: Item, size: Dp, switchedOn: Boolean?) {
     val colors = MaterialTheme.colorScheme
+    val appearance = LocalAppearance.current
+    // A color set in the settings, with text that reads on it.
+    fun custom(hex: String) = appearanceColor(hex).let { it to contentColorOn(it) }
     val (background, content) = when (switchedOn) {
         null -> colors.primaryContainer to colors.onPrimaryContainer
-        true -> colors.primary to colors.onPrimary
-        false -> colors.surfaceVariant to colors.onSurfaceVariant
+        true -> appearance.switchOnColor?.let(::custom) ?: (colors.primary to colors.onPrimary)
+        false -> appearance.switchOffColor?.let(::custom) ?: (colors.surfaceVariant to colors.onSurfaceVariant)
     }
     Box(
         Modifier

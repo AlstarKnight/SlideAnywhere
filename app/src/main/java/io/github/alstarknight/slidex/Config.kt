@@ -262,6 +262,10 @@ enum class Action {
     SETTINGS,
 }
 
+/** The four ways out of the floating icon; its long press shows a shortcut in each. */
+@Serializable
+enum class Direction { UP, DOWN, LEFT, RIGHT }
+
 private val json = Json {
     ignoreUnknownKeys = true
     encodeDefaults = true

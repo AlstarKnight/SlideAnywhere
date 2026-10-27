@@ -22,7 +22,7 @@
     <string name="page_advanced">高级设置</string>
     <string name="page_advanced_summary">黑名单/白名单、横屏隐藏、磁贴和桌面快捷方式、通知</string>
     <string name="page_config">配置管理</string>
-    <string name="page_config_summary">导出、导入所有页面和卡片</string>
+    <string name="page_config_summary">多套配置切换，导出、导入</string>
     <string name="page_about">关于</string>
     <string name="page_about_summary">版本、项目主页</string>
     <string name="setting_show_notification">显示常驻通知</string>
@@ -76,7 +76,17 @@
     <string name="setting_ball_size">大小</string>
     <string name="setting_ball_opacity">不透明度</string>
     <string name="setting_ball_tap">点击图标</string>
-    <string name="setting_ball_long_press">长按图标</string>
+    <string name="ball_pull_hint">从图标往屏幕中间横着滑，面板会跟着手指拉出来。想把图标横着挪，先往上或往下拖一点再移。</string>
+    <string name="setting_ball_haptics">点击和长按时振动</string>
+    <string name="ball_haptics_hint">跟随系统的触感反馈：系统设置里关闭了触感反馈时不会振动。</string>
+    <string name="section_ball_menu">长按快捷项</string>
+    <string name="ball_menu_hint">长按图标，四周会出现下面四个快捷项。按住不放滑向其中一个再松手就会执行；松手后也可以再点，点空白处关闭。可以选快捷操作、应用或链接（比如微信、支付宝的扫一扫）。</string>
+    <string name="ball_menu_empty">未设置</string>
+    <string name="ball_menu_clear">清除</string>
+    <string name="direction_up">上</string>
+    <string name="direction_down">下</string>
+    <string name="direction_left">左</string>
+    <string name="direction_right">右</string>
     <string name="ball_action_panel">打开面板</string>
     <string name="ball_hint">拖动图标可以放到屏幕任意位置，面板从离图标较近的一侧滑出。</string>
     <string name="handle_drag_hint">长按触发条约半秒，等它变亮后拖动，可以改变上下位置，拖过屏幕中线会换到另一侧。</string>
@@ -119,6 +129,19 @@
     <string name="panel_blur_hint">打开面板时把后面的界面模糊。部分手机在省电模式下或系统关闭了模糊效果时不生效。</string>
     <string name="setting_scrim">背景遮罩</string>
     <string name="scrim_hint">打开面板时把后面的界面调暗多少，调到 0 就不调暗。下次打开面板时生效。</string>
+
+    <string name="section_details">卡片和图标</string>
+    <string name="setting_card_radius">卡片圆角</string>
+    <string name="setting_card_gap">卡片间距</string>
+    <string name="setting_panel_padding">面板边距</string>
+    <string name="setting_card_padding">卡片内边距</string>
+    <string name="setting_label_size">图标名称字号</string>
+    <string name="setting_background_color">面板背景色</string>
+    <string name="background_color_hint">用在没有背景图片的页面上；直接显示在页面上的文字会自动换成深色或白色。</string>
+    <string name="setting_switch_on_color">开关打开时的颜色</string>
+    <string name="setting_switch_off_color">开关关闭时的颜色</string>
+    <string name="color_follow_theme">跟随主题</string>
+    <string name="appearance_reset">全部恢复默认</string>
 
     <string name="page_own_theme">本页单独设置主题</string>
     <string name="page_own_theme_hint">关闭时跟随「主题外观」里的主题和深浅色；深浅色选「默认」时也跟随那里。</string>
@@ -312,15 +335,26 @@
     <string name="accessibility_label">SlideX 快捷操作</string>
     <string name="accessibility_description">用于执行快捷方式卡片里的锁屏、截屏、打开通知栏、最近任务、分屏等系统操作；识别当前在前台的应用，以便按黑名单或白名单显示触发条；以及识别输入法窗口的位置，让悬浮图标避开键盘。只查看窗口的类型和位置，不读取屏幕上的文字和内容。</string>
 
-    <string name="config_hint">配置包含所有页面和卡片，导出为 JSON 文件后，换机或重装时可以导入。设置项和背景图片不在其中。</string>
+    <string name="config_hint">把当前配置导出为 zip 文件，背景图片一起打包，换机或重装时再导入。导入的配置作为新的一套加入，不会覆盖现有的。设置项不在其中；换了手机后，小部件需要重新添加。</string>
     <string name="about_version">%1$s %2$s</string>
     <string name="about_project">项目主页</string>
     <string name="about_credits">功能和交互参考已停更的「全局负一屏」，边缘触发参考 Smart Edge（MIT），图标来自 Material Symbols（Apache 2.0），系统开关借助 Shizuku（MIT）。</string>
     <string name="config_export">导出配置</string>
     <string name="config_import">导入配置</string>
     <string name="config_exported">配置已导出</string>
-    <string name="config_imported">配置已导入</string>
-    <string name="config_import_confirm">导入会替换当前所有页面和卡片，确定继续吗？</string>
+    <string name="config_imported">已导入并切换到这套配置</string>
+    <string name="section_configs">配置列表</string>
+    <string name="configs_hint">每套配置有自己的页面、卡片和情景模式，点一下就切换。主题外观等设置所有配置共用。</string>
+    <string name="section_config_files">导出和导入</string>
+    <string name="config_new">新建配置</string>
+    <string name="config_new_name">配置 %d</string>
+    <string name="config_copy">复制当前配置</string>
+    <string name="config_copy_name">%s 副本</string>
+    <string name="config_rename">重命名</string>
+    <string name="config_delete">删除</string>
+    <string name="config_delete_confirm">删除配置「%s」？它的页面和卡片会一起删除。</string>
+    <string name="config_default_name">默认配置</string>
+    <string name="config_imported_name">导入的配置</string>
     <string name="config_invalid">不是有效的配置文件</string>
     <string name="config_io_failed">读写文件失败</string>
 

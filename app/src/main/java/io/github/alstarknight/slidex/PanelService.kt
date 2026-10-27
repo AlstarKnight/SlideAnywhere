@@ -120,7 +120,16 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
     private fun addTrigger() {
         when (prefs.triggerMode) {
             TriggerMode.EDGE -> addHandle()
-            TriggerMode.BALL -> ball = FloatingBall(this, windowManager, prefs, onGesture = ::onBallGesture).also { it.add() }
+            TriggerMode.BALL -> ball = FloatingBall(
+                this,
+                windowManager,
+                prefs,
+                onTap = ::onBallTap,
+                onPullStart = { side, rawX -> openPanel(side, heldAt = rawX) },
+                onPull = { rawX -> panel?.drag(rawX) },
+                onPullEnd = ::releasePanel,
+                onPick = { item -> launcher.launch(item) },
+            ).also { it.add() }
         }
         updateKeyboard()
         updateTriggerVisibility()
@@ -145,9 +154,16 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
         ball?.visible = visible
     }
 
-    /** A tap or long press on the floating icon: null opens the panel, anything else runs that action. */
-    private fun onBallGesture(action: Action?, side: Side) {
+    /** A tap on the floating icon opens the panel, or runs the action chosen for it. */
+    private fun onBallTap(side: Side) {
+        val action = prefs.ballTapAction
         if (action == null) openPanel(side) else launcher.launch(ActionItem(getString(action.labelRes), action))
+    }
+
+    /** Lets go of a panel pulled out by a finger, moving sideways at [velocityX]. */
+    private fun releasePanel(velocityX: Float) {
+        panel?.release(velocityX)
+        updateTriggerVisibility()
     }
 
     private fun removeTrigger() {
@@ -162,10 +178,7 @@ class PanelService : Service(), SharedPreferences.OnSharedPreferenceChangeListen
             this,
             onOpen = { rawX -> openPanel(prefs.side, heldAt = rawX.takeIf { prefs.followFinger }) },
             onDrag = { rawX -> panel?.drag(rawX) },
-            onRelease = { velocityX ->
-                panel?.release(velocityX)
-                updateTriggerVisibility()
-            },
+            onRelease = ::releasePanel,
             onMove = ::moveHandle,
             onMoveEnd = ::dropHandle,
         )
