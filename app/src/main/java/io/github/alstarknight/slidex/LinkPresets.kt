@@ -38,15 +38,13 @@ private val LINK_PRESETS = listOf(
         LinkPreset(R.string.preset_transfer, "${ALIPAY}20000221"),
         LinkPreset(R.string.preset_ant_forest, "${ALIPAY}60000002"),
     ),
-    // WeChat's own launcher shortcut for the scanner. Its pay code has no documented link for other apps; the one
-    // here is from iOS scheme lists and may only open WeChat.
+    // WeChat's own launcher shortcut for the scanner. Its pay code has no link other apps may open.
     "com.tencent.mm" to listOf(
         LinkPreset(
             R.string.preset_scan,
             "intent:#Intent;component=com.tencent.mm/.ui.LauncherUI;" +
                 "B.LauncherUI.From.Scaner.Shortcut=true;launchFlags=0x14000000;end",
         ),
-        LinkPreset(R.string.preset_pay_code_trial, "weixin://widget/pay"),
     ),
     // The links below come from public scheme lists and were not checked on every app version.
     "com.unionpay" to listOf(

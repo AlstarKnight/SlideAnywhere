@@ -206,7 +206,6 @@
     <string name="app_shortcut_hint">长按应用图标出现的快捷方式中，应用写在安装包里的那些。应用运行后才加上的快捷方式只有桌面能打开，所以不会出现在这里。</string>
     <string name="preset_scan">扫一扫</string>
     <string name="preset_pay_code">付款码</string>
-    <string name="preset_pay_code_trial">付款码（试验）</string>
     <string name="preset_receive_code">收款码</string>
     <string name="preset_bus_code">乘车码</string>
     <string name="preset_transfer">转账</string>
